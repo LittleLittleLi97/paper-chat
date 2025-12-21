@@ -2,13 +2,19 @@
   <div class="paper-reader">
     <h3>{{ selectedPaper ? selectedPaper.title : '论文阅读器' }}</h3>
     <div class="content">
-      <p v-if="selectedPaper">{{ selectedPaper.content }}</p>
-      <p v-else>请选择左侧的一篇论文开始阅读</p>
+      <canvas ref="pdfCanvasRef"></canvas>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker?worker';
+import file from '../assets/CMF 2025中期.pdf';
+import { ref, onMounted } from 'vue';
+
+pdfjsLib.GlobalWorkerOptions.workerPort = new pdfWorker();
+
 interface Paper {
   id: number
   title: string
@@ -20,6 +26,35 @@ interface Props {
 }
 
 defineProps<Props>()
+
+const pdfCanvasRef = ref<HTMLCanvasElement>();
+
+async function renderPage(
+  pdfUrl: string,
+  pageNum: number,
+  canvas: HTMLCanvasElement
+) {
+  const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
+  const page = await pdf.getPage(pageNum);
+
+  const viewport = page.getViewport({ scale: 1.5 });
+  const ctx = canvas.getContext('2d')!;
+
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+
+  await page.render({
+    canvasContext: ctx,
+    canvas,
+    viewport
+  }).promise;
+}
+
+onMounted(()=>{
+  if (pdfCanvasRef.value) {
+    renderPage(file, 1, pdfCanvasRef.value);
+  }
+})
 </script>
 
 <style scoped>
