@@ -1,7 +1,7 @@
 <template>
   <div class="paper-reader">
     <h3>{{ selectedPaper ? selectedPaper.title : '论文阅读器' }}</h3>
-    <div class="content">
+    <div class="content" ref="contentRef">
       <canvas ref="pdfCanvasRef"></canvas>
     </div>
   </div>
@@ -10,7 +10,7 @@
 <script setup lang="ts">
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker?worker';
-import file from '../assets/CMF 2025中期.pdf';
+import file from '../assets/test.pdf';
 import { ref, onMounted } from 'vue';
 
 pdfjsLib.GlobalWorkerOptions.workerPort = new pdfWorker();
@@ -27,6 +27,7 @@ interface Props {
 
 defineProps<Props>()
 
+const contentRef = ref<HTMLDivElement>();
 const pdfCanvasRef = ref<HTMLCanvasElement>();
 
 async function renderPage(
@@ -48,6 +49,29 @@ async function renderPage(
     canvas,
     viewport
   }).promise;
+
+  await renderTextLayer(page, viewport);
+}
+
+async function renderTextLayer(page, viewport) {
+  const textContent = await page.getTextContent()
+
+  const textLayerDiv = document.createElement('div')
+  textLayerDiv.className = 'textLayer'
+
+  contentRef.value!
+    .querySelectorAll('.textLayer')
+    .forEach(el => el.remove())
+
+  contentRef.value!.appendChild(textLayerDiv)
+
+  const textLayer = new pdfjsLib.TextLayer({
+    textContentSource: textContent,
+    container: textLayerDiv,
+    viewport
+  })
+
+  await textLayer.render()
 }
 
 onMounted(()=>{
@@ -78,5 +102,11 @@ h3 {
 .content {
   line-height: 1.6;
   font-size: 14px;
+}
+
+.textLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
 }
 </style>
