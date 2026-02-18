@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import systemPrompt from '../renderer/src/assets/prompts/system.md?raw'
 
 // 消息接口定义
 export interface ChatMessage {
@@ -29,9 +30,14 @@ export class AIService {
         throw new Error('API Key 未配置，请在 .env 文件中设置 VITE_DEEPSEEK_API_KEY')
       }
 
+      const messagesWithSystemPrompt: Array<ChatMessage> = [
+        { role: 'system', content: systemPrompt },
+        ...messages
+      ]
+
       const completion = await openai.chat.completions.create({
         model: 'deepseek-chat',
-        messages: messages,
+        messages: messagesWithSystemPrompt,
       })
 
       const content = completion.choices[0]?.message?.content
