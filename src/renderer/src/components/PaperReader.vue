@@ -61,10 +61,22 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 // 配置 PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
-// PDF 文档路径 - 使用静态导入
-import pdfFileUrl from '../assets/test.pdf?url'
+// Props
+interface Paper {
+  id: number
+  title: string
+  content?: string
+  path: string
+}
 
-const pdfUrl = pdfFileUrl
+interface Props {
+  selectedPaper: Paper | null
+}
+
+const props = defineProps<Props>()
+
+// 当前PDF URL
+const pdfUrl = ref<string>('')
 
 // 加载状态
 const isLoading = ref(false)
@@ -121,14 +133,60 @@ let renderDebounceTimer: number | null = null
 const currentTool = ref<'select' | 'highlight'>('select')
 const annotations = ref<Map<number, any[]>>(new Map())
 
+// 重置 PDF 相关状态
+const resetPDFState = () => {
+  // 重置页面状态
+  currentPage.value = 1
+  pageInput.value = 1
+  totalPages.value = 0
+  
+  // 重置缩放状态
+  scale.value = 1
+  
+  // 重置标注状态
+  annotations.value.clear()
+  
+  // 重置渲染状态
+  pageRendered.value = false
+  
+  // 清除 Canvas 引用
+  pageCanvases.value.clear()
+  textLayers.value.clear()
+  annotationCanvases.value.clear()
+  
+  // 清除渲染任务
+  renderTasks.value.forEach((task) => {
+    try {
+      task.cancel()
+    } catch (e) {
+      // 忽略错误
+    }
+  })
+  renderTasks.value.clear()
+}
+
 // 加载 PDF 文档
 const loadPDF = async () => {
+  if (!pdfUrl.value) {
+    resetPDFState()
+    errorMessage.value = '请选择一个 PDF 文件'
+    return
+  }
+  
   isLoading.value = true
   errorMessage.value = ''
   try {
-    console.log('开始加载 PDF，URL:', pdfUrl)
+    console.log('开始加载 PDF，路径:', pdfUrl.value)
+    
+    // 使用主进程读取PDF文件内容
+    const pdfData = await window.api.paper.readPDF(pdfUrl.value)
+    
+    // 将数据转换为Uint8Array
+    const pdfArray = new Uint8Array(pdfData)
+    
+    // 使用PDF.js加载PDF数据
     const loadingTask = pdfjsLib.getDocument({
-      url: pdfUrl,
+      data: pdfArray,
       verbosity: 0, // 减少控制台输出
       useSystemFonts: false,
       standardFontDataUrl: undefined
@@ -151,6 +209,23 @@ const loadPDF = async () => {
     isLoading.value = false
   }
 }
+
+// 监听 selectedPaper 变化
+watch(() => props.selectedPaper, (newPaper) => {
+  if (newPaper && newPaper.path) {
+    // 重置状态
+    resetPDFState()
+    // 更新 PDF URL
+    pdfUrl.value = newPaper.path
+    // 重新加载 PDF
+    loadPDF()
+  } else {
+    // 清空状态
+    resetPDFState()
+    pdfUrl.value = ''
+    errorMessage.value = '请选择一个 PDF 文件'
+  }
+}, { immediate: true })
 
 // 渲染单个页面
 const renderPage = async (pageNum: number) => {
@@ -620,8 +695,8 @@ onMounted(async () => {
   // 额外等待确保 Canvas 元素已创建
   await new Promise((resolve) => setTimeout(resolve, 50))
 
-  // 加载 PDF
-  await loadPDF()
+  // 不需要在这里调用 loadPDF()，因为 watch 会在 selectedPaper 变化时自动调用
+  // 并且我们设置了 immediate: true，会在组件挂载时执行一次
 })
 
 onUnmounted(() => {

@@ -145,6 +145,18 @@ function setupIpcHandlers(): void {
       throw error
     }
   })
+
+  // PDF文件读取相关IPC（用于解决本地文件加载问题）
+  ipcMain.handle('paper:readPDF', async (_, path) => {
+    try {
+      const fs = require('fs')
+      const data = fs.readFileSync(path)
+      return Array.from(data)
+    } catch (error) {
+      console.error('读取PDF文件失败:', error)
+      throw error
+    }
+  })
 }
 
 // This method will be called when Electron has finished

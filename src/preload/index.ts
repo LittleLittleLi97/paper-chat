@@ -23,7 +23,8 @@ const api = {
     savePaper: (paper: { title: string; content: string; path?: string }) => ipcRenderer.invoke('paper:savePaper', paper),
     getAllPapers: () => ipcRenderer.invoke('paper:getAllPapers'),
     getPaperById: (id: number) => ipcRenderer.invoke('paper:getPaperById', id),
-    deletePaper: (id: number) => ipcRenderer.invoke('paper:deletePaper', id)
+    deletePaper: (id: number) => ipcRenderer.invoke('paper:deletePaper', id),
+    readPDF: (path: string) => ipcRenderer.invoke('paper:readPDF', path)
   }
 }
 

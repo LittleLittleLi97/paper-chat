@@ -21,6 +21,7 @@ declare global {
         getAllPapers: () => Promise<Paper[]>
         getPaperById: (id: number) => Promise<Paper | null>
         deletePaper: (id: number) => Promise<void>
+        readPDF: (path: string) => Promise<number[]>
       }
     }
   }
