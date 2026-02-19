@@ -1,7 +1,12 @@
 <template>
   <div class="app-container">
     <div class="sidebar">
-      <PaperList :papers="papers" :selected-paper="selectedPaper" @select-paper="selectPaper" />
+      <PaperList
+        :papers="papers"
+        :selected-paper="selectedPaper"
+        @select-paper="selectPaper"
+        @add-paper="addPaper"
+      />
     </div>
     <div class="main-content">
       <PaperReader :selected-paper="selectedPaper" />
@@ -13,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import PaperList from './components/PaperList.vue'
 import PaperReader from './components/PaperReader.vue'
 import AIChat from './components/AIChat.vue'
@@ -21,19 +26,64 @@ import AIChat from './components/AIChat.vue'
 interface Paper {
   id: number
   title: string
-  content: string
+  content?: string
+  path: string
 }
 
 const selectedPaper = ref<Paper | null>(null)
 
-const papers = ref<Paper[]>([
-  { id: 1, title: '论文1: 人工智能的发展', content: '人工智能（Artificial Intelligence，简称AI）是指由人制造出来的系统所表现出来的智能。通常，人工智能是指通过普通计算机程序来呈现人类智能的技术。人工智能的发展历程可以追溯到20世纪中叶，当时计算机科学家开始探索如何让机器模拟人类的思维过程。\n\n人工智能的发展经历了几个阶段：\n1. 早期阶段（1950s-1960s）：图灵测试和专家系统\n2. 知识工程阶段（1970s-1980s）：知识表示和推理\n3. 机器学习阶段（1990s-现在）：神经网络和深度学习\n\n近年来，随着计算能力的提升和大数据的可用性，人工智能取得了重大突破，在图像识别、自然语言处理、自动驾驶等领域取得了显著进展。' },
-  { id: 2, title: '论文2: 机器学习基础', content: '机器学习是人工智能的一个子领域，它使计算机能够从数据中学习，而无需显式编程。机器学习算法可以分为三大类：监督学习、无监督学习和强化学习。\n\n监督学习使用标记的训练数据来学习输入到输出的映射。例如，分类和回归问题。\n\n无监督学习则是在没有标记的数据中发现隐藏的模式，如聚类和降维。\n\n强化学习通过与环境的交互来学习最优策略，适用于游戏和机器人控制等领域。\n\n机器学习的核心是算法和数据。常见的算法包括线性回归、决策树、支持向量机、神经网络等。随着深度学习的兴起，神经网络已成为最强大的机器学习工具之一。' },
-])
+const papers = ref<Paper[]>([])
 
 const selectPaper = (paper: Paper) => {
   selectedPaper.value = paper
 }
+
+const addPaper = async (): Promise<void> => {
+  try {
+    const filePaths = await window.api.file.selectPDF()
+    if (filePaths && filePaths.length > 0) {
+      // 处理选择的PDF文件
+      for (const path of filePaths) {
+        // 从路径中提取文件名作为标题
+        const title = path.split('\\').pop() || path
+        // 创建新的paper对象（不包含id，由数据库自动生成）
+        const newPaper: Omit<Paper, 'id'> = {
+          title,
+          content: '', // PDF内容暂时为空
+          path
+        }
+        // 保存到数据库
+        const id = await window.api.paper.savePaper(newPaper)
+        // 创建包含id的paper对象
+        const paperWithId: Paper = {
+          ...newPaper,
+          id
+        }
+        // 添加到papers数组
+        papers.value.push(paperWithId)
+      }
+    }
+  } catch (error) {
+    console.error('添加PDF文件失败:', error)
+  }
+}
+
+// 初始化函数，从数据库加载PDF文件
+const initPapers = async (): Promise<void> => {
+  try {
+    const loadedPapers = await window.api.paper.getAllPapers()
+    if (loadedPapers && loadedPapers.length > 0) {
+      papers.value = loadedPapers
+    }
+  } catch (error) {
+    console.error('加载PDF文件失败:', error)
+  }
+}
+
+// 组件挂载时初始化
+onMounted(async (): Promise<void> => {
+  await initPapers()
+})
 </script>
 
 <style scoped>

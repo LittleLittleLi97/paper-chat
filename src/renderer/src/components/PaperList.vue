@@ -1,6 +1,9 @@
 <template>
   <div class="paper-list">
-    <h3>论文列表</h3>
+    <div class="paper-list-header">
+      <h3>论文列表</h3>
+      <button class="add-button" @click="addPaper">添加</button>
+    </div>
     <ul>
       <li
         v-for="paper in papers"
@@ -18,7 +21,8 @@
 interface Paper {
   id: number
   title: string
-  content: string
+  content?: string
+  path: string
 }
 
 interface Props {
@@ -26,14 +30,19 @@ interface Props {
   selectedPaper: Paper | null
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 
 const emit = defineEmits<{
   selectPaper: [paper: Paper]
+  addPaper: []
 }>()
 
-const selectPaper = (paper: Paper) => {
+const selectPaper = (paper: Paper): void => {
   emit('selectPaper', paper)
+}
+
+const addPaper = (): void => {
+  emit('addPaper')
 }
 </script>
 
@@ -47,11 +56,37 @@ const selectPaper = (paper: Paper) => {
   box-sizing: border-box;
 }
 
+.paper-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
 h3 {
-  margin: 0 0 10px 0;
+  margin: 0;
   color: #cccccc;
   font-size: 14px;
   font-weight: 600;
+}
+
+.add-button {
+  background-color: #0e639c;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+.add-button:hover {
+  background-color: #1177bb;
+}
+
+.add-button:active {
+  background-color: #0c5a8a;
 }
 
 ul {

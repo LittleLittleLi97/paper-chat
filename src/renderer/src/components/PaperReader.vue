@@ -10,20 +10,15 @@
         <button @click="fitHeight" title="适应高度">适应高度</button>
         <button @click="fitPage" title="适应页面">适应页面</button>
       </div>
-      
+
       <div class="toolbar-group">
         <span class="page-info">第 {{ currentPage }} 页 / 共 {{ totalPages }} 页</span>
       </div>
 
       <div class="toolbar-group">
-        <button 
-          @click="applyHighlight" 
-          title="高亮选中文本"
-        >
-          高亮
-        </button>
-        <button 
-          @click="setTool('select')" 
+        <button @click="applyHighlight" title="高亮选中文本">高亮</button>
+        <button
+          @click="setTool('select')"
           :class="{ active: currentTool === 'select' }"
           title="选择工具"
         >
@@ -38,24 +33,18 @@
       <div v-if="isLoading" class="loading-message">正在加载 PDF...</div>
       <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
       <div v-show="!isLoading && !errorMessage" class="pdf-pages-container">
-        <div 
-          v-for="pageNum in totalPages" 
+        <div
+          v-for="pageNum in totalPages"
           :key="pageNum"
           class="pdf-page-wrapper"
           :data-page="pageNum"
         >
-          <canvas 
-            :ref="el => setPageCanvas(pageNum, el)"
-            class="pdf-canvas"
-          ></canvas>
+          <canvas :ref="(el) => setPageCanvas(pageNum, el)" class="pdf-canvas"></canvas>
           <!-- 文本层 -->
-          <div 
-            :ref="el => setTextLayer(pageNum, el)"
-            class="text-layer"
-          ></div>
+          <div :ref="(el) => setTextLayer(pageNum, el)" class="text-layer"></div>
           <!-- 标注层 -->
-          <canvas 
-            :ref="el => setAnnotationCanvas(pageNum, el)"
+          <canvas
+            :ref="(el) => setAnnotationCanvas(pageNum, el)"
             class="annotation-canvas"
           ></canvas>
         </div>
@@ -138,7 +127,7 @@ const loadPDF = async () => {
   errorMessage.value = ''
   try {
     console.log('开始加载 PDF，URL:', pdfUrl)
-    const loadingTask = pdfjsLib.getDocument({ 
+    const loadingTask = pdfjsLib.getDocument({
       url: pdfUrl,
       verbosity: 0, // 减少控制台输出
       useSystemFonts: false,
@@ -149,10 +138,10 @@ const loadPDF = async () => {
     currentPage.value = 1
     pageInput.value = 1
     console.log('PDF 加载成功，总页数:', totalPages.value)
-    
+
     // 等待一下确保文档完全初始化
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
     await nextTick() // 确保 DOM 已更新
     await renderAllPages()
   } catch (error) {
@@ -169,15 +158,15 @@ const renderPage = async (pageNum: number) => {
     console.warn('PDF 文档未加载')
     return
   }
-  
+
   // 等待 Canvas 元素准备好（最多等待 1 秒）
   let retries = 10
   while (!pageCanvases.value.has(pageNum) && retries > 0) {
     await nextTick()
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, 100))
     retries--
   }
-  
+
   const canvas = pageCanvases.value.get(pageNum)
   if (!canvas) {
     console.warn(`第 ${pageNum} 页 Canvas 元素未准备好`)
@@ -187,24 +176,24 @@ const renderPage = async (pageNum: number) => {
   try {
     // 获取页面对象
     const page = await pdfDoc.value.getPage(pageNum)
-    
+
     // 确保页面对象有效
     if (!page || typeof page.getViewport !== 'function') {
       throw new Error('页面对象无效或未正确初始化')
     }
-    
+
     // 添加小延迟确保页面完全初始化
-    await new Promise(resolve => setTimeout(resolve, 10))
-    
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
     const dpr = window.devicePixelRatio || 1
-    
+
     // 先计算基础 viewport（scale = 1）用于显示尺寸
     const baseViewport = page.getViewport({ scale: 1 })
-    
+
     // 计算实际渲染的 viewport（包含缩放和设备像素比）
     const renderScale = scale.value * dpr
     const viewport = page.getViewport({ scale: renderScale })
-    
+
     const context = canvas.getContext('2d', { alpha: false })
     if (!context) {
       console.error('无法获取 Canvas 2D 上下文')
@@ -214,7 +203,7 @@ const renderPage = async (pageNum: number) => {
     // 设置 Canvas 实际像素尺寸（用于渲染）
     canvas.width = viewport.width
     canvas.height = viewport.height
-    
+
     // 设置 Canvas 显示尺寸（CSS 像素）
     canvas.style.width = `${baseViewport.width * scale.value}px`
     canvas.style.height = `${baseViewport.height * scale.value}px`
@@ -240,11 +229,11 @@ const renderPage = async (pageNum: number) => {
       }
       renderTasks.value.delete(pageNum)
     }
-    
+
     // 渲染页面
     const renderTask = page.render(renderContext)
     renderTasks.value.set(pageNum, renderTask)
-    
+
     try {
       await renderTask.promise
       console.log(`第 ${pageNum} 页渲染完成`)
@@ -258,11 +247,11 @@ const renderPage = async (pageNum: number) => {
     } finally {
       renderTasks.value.delete(pageNum)
     }
-    
+
     // 渲染文本层
     await nextTick()
     await renderTextLayer(pageNum, page, baseViewport)
-    
+
     // 重新渲染标注
     await nextTick()
     renderPageAnnotations(pageNum)
@@ -274,9 +263,9 @@ const renderPage = async (pageNum: number) => {
 // 渲染所有页面
 const renderAllPages = async () => {
   if (!pdfDoc.value || totalPages.value === 0) return
-  
+
   pageRendered.value = false
-  
+
   // 并行渲染所有页面（限制并发数避免性能问题）
   const concurrency = 3
   for (let i = 0; i < totalPages.value; i += concurrency) {
@@ -286,11 +275,10 @@ const renderAllPages = async () => {
     }
     await Promise.all(pagePromises)
   }
-  
+
   pageRendered.value = true
   console.log('所有页面渲染完成')
 }
-
 
 // 缩放功能
 const zoomIn = () => {
@@ -334,11 +322,11 @@ const fitPage = async () => {
 // 滚动功能 - 计算当前可见的页面
 const calculateVisiblePage = () => {
   if (!viewportRef.value) return
-  
+
   const scrollTop = viewportRef.value.scrollTop
   const viewportHeight = viewportRef.value.clientHeight
   const centerY = scrollTop + viewportHeight / 2
-  
+
   // 遍历所有页面，找到中心点所在的页面
   let currentTop = 0
   for (let i = 1; i <= totalPages.value; i++) {
@@ -352,7 +340,7 @@ const calculateVisiblePage = () => {
       currentTop += pageHeight
     }
   }
-  
+
   // 如果没找到，使用最后一个页面
   if (currentTop > 0) {
     currentPage.value = totalPages.value
@@ -383,7 +371,7 @@ const renderTextLayer = async (pageNum: number, page: any, baseViewport: any) =>
   try {
     const textContent = await page.getTextContent()
     textLayer.innerHTML = ''
-    
+
     // 设置文本层尺寸与Canvas显示尺寸一致
     const canvas = pageCanvases.value.get(pageNum)
     if (canvas) {
@@ -393,7 +381,7 @@ const renderTextLayer = async (pageNum: number, page: any, baseViewport: any) =>
       textLayer.style.width = `${baseViewport.width * scale.value}px`
       textLayer.style.height = `${baseViewport.height * scale.value}px`
     }
-    
+
     textLayer.style.left = '0px'
     textLayer.style.top = '0px'
 
@@ -404,22 +392,22 @@ const renderTextLayer = async (pageNum: number, page: any, baseViewport: any) =>
       const span = document.createElement('span')
       span.textContent = item.str
       span.style.position = 'absolute'
-      
+
       // PDF坐标系：左下角为原点，Y轴向上
       // 屏幕坐标系：左上角为原点，Y轴向下
       // tx[4]是X坐标，tx[5]是Y坐标（PDF坐标系，通常是基线位置）
       const pdfX = tx[4]
       const pdfY = tx[5]
       const fontSize = Math.abs(tx[0]) * scale.value
-      
+
       // 转换为屏幕坐标
       // tx[5]是基线位置，需要向上调整以对齐文本顶部
       // 根据实际测试，需要减去字体大小的约85-90%来对齐文本顶部
       const screenY = (baseViewport.height - pdfY) * scale.value - fontSize * 0.85
-      
+
       span.style.left = `${pdfX * scale.value}px`
       span.style.top = `${screenY}px`
-      
+
       // 字体大小需要考虑缩放
       span.style.fontSize = `${fontSize}px`
       span.style.fontFamily = item.fontName || 'sans-serif'
@@ -457,7 +445,7 @@ const renderPageAnnotations = (pageNum: number) => {
   const canvas = annotationCanvases.value.get(pageNum)
   const pdfCanvas = pageCanvases.value.get(pageNum)
   if (!canvas || !pdfCanvas) return
-  
+
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
@@ -472,7 +460,7 @@ const renderPageAnnotations = (pageNum: number) => {
 
   // 获取该页的标注
   const pageAnnotations = annotations.value.get(pageNum) || []
-  
+
   pageAnnotations.forEach((annotation: any) => {
     if (annotation.type === 'highlight' && annotation.rects) {
       ctx.save()
@@ -504,11 +492,14 @@ const applyHighlight = async () => {
   // 找到选中文本所在的页面
   let targetPage = 1
   let textLayerEl: HTMLDivElement | null = null
-  
+
   for (const [pageNum, layer] of textLayers.value.entries()) {
-    if (layer && (layer.contains(range.commonAncestorContainer) || 
-                  layer.contains(range.startContainer) ||
-                  layer.contains(range.endContainer))) {
+    if (
+      layer &&
+      (layer.contains(range.commonAncestorContainer) ||
+        layer.contains(range.startContainer) ||
+        layer.contains(range.endContainer))
+    ) {
       targetPage = pageNum
       textLayerEl = layer
       break
@@ -529,7 +520,7 @@ const applyHighlight = async () => {
         }
       }
     }
-    
+
     if (!textLayerEl) {
       targetPage = currentPage.value
       textLayerEl = textLayers.value.get(targetPage) || null
@@ -562,36 +553,40 @@ const applyHighlight = async () => {
 
     const canvasRect = pdfCanvas.getBoundingClientRect()
     const layerRect = textLayerEl.getBoundingClientRect()
-    
+
     // 计算缩放比例（从文本层的显示尺寸到Canvas的实际尺寸）
     const scaleX = pdfCanvas.width / canvasRect.width
     const scaleY = pdfCanvas.height / canvasRect.height
 
     const rects: Array<{ x: number; y: number; width: number; height: number }> = []
-    
+
     for (let i = 0; i < rangeRects.length; i++) {
       const rect = rangeRects[i]
       if (!rect) continue
-      
+
       // 计算相对于文本层的坐标
       const relativeX = rect.left - layerRect.left
       const relativeY = rect.top - layerRect.top
-      
+
       // 转换为Canvas坐标（相对于Canvas的实际尺寸）
       const x = relativeX * scaleX
       const y = relativeY * scaleY
       const width = rect.width * scaleX
       const height = rect.height * scaleY
-      
+
       rects.push({ x, y, width, height })
     }
 
     if (rects.length > 0) {
-      saveAnnotation('highlight', {
-        rects: rects,
-        text: selectedText
-      }, targetPage)
-      
+      saveAnnotation(
+        'highlight',
+        {
+          rects: rects,
+          text: selectedText
+        },
+        targetPage
+      )
+
       // 清除选择
       selection.removeAllRanges()
     } else {
@@ -623,8 +618,8 @@ onMounted(async () => {
   // 等待 DOM 完全渲染
   await nextTick()
   // 额外等待确保 Canvas 元素已创建
-  await new Promise(resolve => setTimeout(resolve, 50))
-  
+  await new Promise((resolve) => setTimeout(resolve, 50))
+
   // 加载 PDF
   await loadPDF()
 })
@@ -639,7 +634,7 @@ onUnmounted(() => {
     }
   })
   renderTasks.value.clear()
-  
+
   // 清理定时器
   if (renderDebounceTimer) {
     clearTimeout(renderDebounceTimer)

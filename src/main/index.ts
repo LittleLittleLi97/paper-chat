@@ -1,9 +1,10 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { ChatStorage } from './services/chatStorage'
 import { AIService } from './services/aiService'
+import { PaperStorage } from './services/paperStorage'
 
 function createWindow(): void {
   // Create the browser window.
@@ -38,7 +39,7 @@ function createWindow(): void {
 }
 
 // 设置IPC处理程序
-function setupIpcHandlers() {
+function setupIpcHandlers(): void {
   // 聊天存储相关IPC
   ipcMain.handle('chat:saveMessage', async (_, message) => {
     try {
@@ -82,6 +83,65 @@ function setupIpcHandlers() {
       return await AIService.chat(messages)
     } catch (error) {
       console.error('AI聊天失败:', error)
+      throw error
+    }
+  })
+
+  // 文件选择相关IPC
+  ipcMain.handle('file:selectPDF', async () => {
+    try {
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        properties: ['openFile', 'multiSelections'],
+        filters: [
+          {
+            name: 'PDF文件',
+            extensions: ['pdf']
+          }
+        ]
+      })
+      if (canceled) {
+        return null
+      }
+      return filePaths
+    } catch (error) {
+      console.error('选择PDF文件失败:', error)
+      throw error
+    }
+  })
+
+  // PDF文件存储相关IPC
+  ipcMain.handle('paper:savePaper', async (_, paper) => {
+    try {
+      return await PaperStorage.savePaper(paper)
+    } catch (error) {
+      console.error('保存PDF文件失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('paper:getAllPapers', async () => {
+    try {
+      return await PaperStorage.getAllPapers()
+    } catch (error) {
+      console.error('获取PDF文件失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('paper:getPaperById', async (_, id) => {
+    try {
+      return await PaperStorage.getPaperById(id)
+    } catch (error) {
+      console.error('获取PDF文件失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('paper:deletePaper', async (_, id) => {
+    try {
+      return await PaperStorage.deletePaper(id)
+    } catch (error) {
+      console.error('删除PDF文件失败:', error)
       throw error
     }
   })

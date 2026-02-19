@@ -9,7 +9,18 @@ declare global {
         deleteMessage: (id: number) => Promise<void>
       }
       ai: {
-        chat: (messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>) => Promise<string>
+        chat: (
+          messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
+        ) => Promise<string>
+      }
+      file: {
+        selectPDF: () => Promise<string[] | null>
+      }
+      paper: {
+        savePaper: (paper: Omit<Paper, 'id'>) => Promise<number>
+        getAllPapers: () => Promise<Paper[]>
+        getPaperById: (id: number) => Promise<Paper | null>
+        deletePaper: (id: number) => Promise<void>
       }
     }
   }
@@ -20,6 +31,13 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp: number
+}
+
+interface Paper {
+  id: number
+  title: string
+  path: string
+  content?: string
 }
 
 export {}

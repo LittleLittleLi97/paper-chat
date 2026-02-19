@@ -5,14 +5,25 @@ import { electronAPI } from '@electron-toolkit/preload'
 const api = {
   // 聊天存储相关API
   chat: {
-    saveMessage: (message: any) => ipcRenderer.invoke('chat:saveMessage', message),
+    saveMessage: (message: { role: 'user' | 'assistant'; content: string; timestamp: number }) => ipcRenderer.invoke('chat:saveMessage', message),
     getAllMessages: () => ipcRenderer.invoke('chat:getAllMessages'),
     clearMessages: () => ipcRenderer.invoke('chat:clearMessages'),
     deleteMessage: (id: number) => ipcRenderer.invoke('chat:deleteMessage', id)
   },
   // AI服务相关API
   ai: {
-    chat: (messages: any[]) => ipcRenderer.invoke('ai:chat', messages)
+    chat: (messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>) => ipcRenderer.invoke('ai:chat', messages)
+  },
+  // 文件选择相关API
+  file: {
+    selectPDF: () => ipcRenderer.invoke('file:selectPDF')
+  },
+  // PDF文件存储相关API
+  paper: {
+    savePaper: (paper: { title: string; content: string; path?: string }) => ipcRenderer.invoke('paper:savePaper', paper),
+    getAllPapers: () => ipcRenderer.invoke('paper:getAllPapers'),
+    getPaperById: (id: number) => ipcRenderer.invoke('paper:getPaperById', id),
+    deletePaper: (id: number) => ipcRenderer.invoke('paper:deletePaper', id)
   }
 }
 

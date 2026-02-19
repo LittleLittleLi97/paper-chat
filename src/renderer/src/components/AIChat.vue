@@ -10,13 +10,28 @@
           :class="['message-item', message.role === 'user' ? 'user-message' : 'ai-message']"
         >
           <div class="message-avatar">
-            <svg v-if="message.role === 'user'" width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M10 10C12.7614 10 15 7.76142 15 5C15 2.23858 12.7614 0 10 0C7.23858 0 5 2.23858 5 5C5 7.76142 7.23858 10 10 10Z" fill="currentColor"/>
-              <path d="M10 12C5.58172 12 2 14.2386 2 17V20H18V17C18 14.2386 14.4183 12 10 12Z" fill="currentColor"/>
+            <svg
+              v-if="message.role === 'user'"
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+            >
+              <path
+                d="M10 10C12.7614 10 15 7.76142 15 5C15 2.23858 12.7614 0 10 0C7.23858 0 5 2.23858 5 5C5 7.76142 7.23858 10 10 10Z"
+                fill="currentColor"
+              />
+              <path
+                d="M10 12C5.58172 12 2 14.2386 2 17V20H18V17C18 14.2386 14.4183 12 10 12Z"
+                fill="currentColor"
+              />
             </svg>
             <svg v-else width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M10 0C4.47715 0 0 4.47715 0 10C0 15.5228 4.47715 20 10 20C15.5228 20 20 15.5228 20 10C20 4.47715 15.5228 0 10 0ZM10 18C5.58172 18 2 14.4183 2 10C2 5.58172 5.58172 2 10 2C14.4183 2 18 5.58172 18 10C18 14.4183 14.4183 18 10 18Z" fill="currentColor"/>
-              <path d="M9 5H11V7H9V5ZM9 9H11V15H9V9Z" fill="currentColor"/>
+              <path
+                d="M10 0C4.47715 0 0 4.47715 0 10C0 15.5228 4.47715 20 10 20C15.5228 20 20 15.5228 20 10C20 4.47715 15.5228 0 10 0ZM10 18C5.58172 18 2 14.4183 2 10C2 5.58172 5.58172 2 10 2C14.4183 2 18 5.58172 18 10C18 14.4183 14.4183 18 10 18Z"
+                fill="currentColor"
+              />
+              <path d="M9 5H11V7H9V5ZM9 9H11V15H9V9Z" fill="currentColor" />
             </svg>
           </div>
           <div class="message-content">
@@ -30,8 +45,11 @@
         <div v-if="isLoading" class="message-item ai-message">
           <div class="message-avatar">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M10 0C4.47715 0 0 4.47715 0 10C0 15.5228 4.47715 20 10 20C15.5228 20 20 15.5228 20 10C20 4.47715 15.5228 0 10 0ZM10 18C5.58172 18 2 14.4183 2 10C2 5.58172 5.58172 2 10 2C14.4183 2 18 5.58172 18 10C18 14.4183 14.4183 18 10 18Z" fill="currentColor"/>
-              <path d="M9 5H11V7H9V5ZM9 9H11V15H9V9Z" fill="currentColor"/>
+              <path
+                d="M10 0C4.47715 0 0 4.47715 0 10C0 15.5228 4.47715 20 10 20C15.5228 20 20 15.5228 20 10C20 4.47715 15.5228 0 10 0ZM10 18C5.58172 18 2 14.4183 2 10C2 5.58172 5.58172 2 10 2C14.4183 2 18 5.58172 18 10C18 14.4183 14.4183 18 10 18Z"
+                fill="currentColor"
+              />
+              <path d="M9 5H11V7H9V5ZM9 9H11V15H9V9Z" fill="currentColor" />
             </svg>
           </div>
           <div class="message-content">
@@ -48,7 +66,10 @@
         <!-- 错误消息 -->
         <div v-if="errorMessage" class="error-message-banner">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M8 0C3.58 0 0 3.58 0 8C0 12.42 3.58 16 8 16C12.42 16 16 12.42 16 8C16 3.58 12.42 0 8 0ZM9 12H7V10H9V12ZM9 8H7V4H9V8Z" fill="currentColor"/>
+            <path
+              d="M8 0C3.58 0 0 3.58 0 8C0 12.42 3.58 16 8 16C12.42 16 16 12.42 16 8C16 3.58 12.42 0 8 0ZM9 12H7V10H9V12ZM9 8H7V4H9V8Z"
+              fill="currentColor"
+            />
           </svg>
           <span>{{ errorMessage }}</span>
           <button @click="errorMessage = ''" class="error-close">×</button>
@@ -58,7 +79,13 @@
         <div v-if="messages.length === 0 && !isLoading" class="empty-state">
           <div class="empty-icon">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
-              <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path
+                d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
           </div>
           <div class="empty-text">开始与AI对话</div>
@@ -80,14 +107,20 @@
           @input="handleInput"
           ref="inputRef"
         ></textarea>
-        <button 
+        <button
           class="send-button"
           :disabled="!canSend || isLoading"
           @click="handleSend"
           title="发送 (Enter)"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path
+              d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
         </button>
       </div>
@@ -138,7 +171,7 @@ const handleNewLine = () => {
 // 处理发送
 const handleSend = async () => {
   if (!canSend.value) return
-  
+
   const userContent = inputText.value.trim()
   if (!userContent) return
 
@@ -149,7 +182,7 @@ const handleSend = async () => {
   const userMessage: Omit<ChatMessage, 'id'> = {
     role: 'user',
     content: userContent,
-    timestamp: Date.now(),
+    timestamp: Date.now()
   }
 
   // 保存用户消息到后端（SQLite）
@@ -164,13 +197,13 @@ const handleSend = async () => {
   // 添加到消息列表
   const savedUserMessage: ChatMessage = {
     ...userMessage,
-    id: Date.now(), // 临时 ID，实际会从后端获取
+    id: Date.now() // 临时 ID，实际会从后端获取
   }
   messages.value.push(savedUserMessage)
 
   // 清空输入框
   inputText.value = ''
-  
+
   // 重置输入框高度
   if (inputRef.value) {
     inputRef.value.style.height = 'auto'
@@ -184,9 +217,9 @@ const handleSend = async () => {
 
   try {
     // 构建消息历史（用于 AI 调用）
-    const chatHistory = messages.value.map(msg => ({
+    const chatHistory = messages.value.map((msg) => ({
       role: msg.role,
-      content: msg.content,
+      content: msg.content
     }))
 
     // 调用后端 AI 服务
@@ -196,7 +229,7 @@ const handleSend = async () => {
     const aiMessage: Omit<ChatMessage, 'id'> = {
       role: 'assistant',
       content: aiResponse,
-      timestamp: Date.now(),
+      timestamp: Date.now()
     }
 
     // 保存 AI 消息到后端（SQLite）
@@ -205,7 +238,7 @@ const handleSend = async () => {
     // 添加到消息列表
     const savedAiMessage: ChatMessage = {
       ...aiMessage,
-      id: Date.now(), // 临时 ID
+      id: Date.now() // 临时 ID
     }
     messages.value.push(savedAiMessage)
 
@@ -496,7 +529,9 @@ onMounted(() => {
 }
 
 @keyframes loading-bounce {
-  0%, 80%, 100% {
+  0%,
+  80%,
+  100% {
     transform: scale(0);
     opacity: 0.5;
   }

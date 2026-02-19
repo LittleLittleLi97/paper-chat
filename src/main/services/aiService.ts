@@ -14,11 +14,7 @@ export interface ChatMessage {
 }
 
 // 读取系统提示
-const systemPromptPath = path.join(
-  app.getAppPath(),
-  'resources',
-  'system.md'
-)
+const systemPromptPath = path.join(app.getAppPath(), 'resources', 'system.md')
 let systemPrompt = ''
 try {
   systemPrompt = fs.readFileSync(systemPromptPath, 'utf8')
@@ -57,7 +53,7 @@ export class AIService {
 
       const completion = await openai.chat.completions.create({
         model: 'deepseek-chat',
-        messages: messagesWithSystemPrompt,
+        messages: messagesWithSystemPrompt
       })
 
       const content = completion.choices[0]?.message?.content
@@ -68,7 +64,7 @@ export class AIService {
       return content
     } catch (error) {
       console.error('AI 服务调用失败:', error)
-      
+
       if (error instanceof Error) {
         // 处理不同类型的错误
         if (error.message.includes('API Key')) {
@@ -79,7 +75,7 @@ export class AIService {
           throw new Error(`AI 服务错误: ${error.message}`)
         }
       }
-      
+
       throw new Error('AI 服务调用失败，请稍后重试')
     }
   }
