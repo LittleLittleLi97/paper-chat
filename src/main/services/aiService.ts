@@ -1,5 +1,11 @@
 import OpenAI from 'openai'
-import systemPrompt from '../renderer/src/assets/prompts/system.md?raw'
+import fs from 'fs'
+import path from 'path'
+import dotenv from 'dotenv'
+import { app } from 'electron'
+
+// 加载.env文件中的环境变量
+dotenv.config()
 
 // 消息接口定义
 export interface ChatMessage {
@@ -7,15 +13,29 @@ export interface ChatMessage {
   content: string
 }
 
+// 读取系统提示
+const systemPromptPath = path.join(
+  app.getAppPath(),
+  'resources',
+  'system.md'
+)
+let systemPrompt = ''
+try {
+  systemPrompt = fs.readFileSync(systemPromptPath, 'utf8')
+} catch (error) {
+  console.error('读取系统提示文件失败:', error)
+  systemPrompt = '你是一个智能助手，帮助用户解答问题。'
+}
+
 // 初始化 OpenAI 客户端
 const openai = new OpenAI({
   baseURL: 'https://api.deepseek.com',
-  apiKey: import.meta.env.VITE_DEEPSEEK_API_KEY,
-  dangerouslyAllowBrowser: true
+  apiKey: process.env.VITE_DEEPSEEK_API_KEY,
+  dangerouslyAllowBrowser: false // 后端不需要这个选项
 })
 
 /**
- * AI 服务类
+ * AI 服务类（后端）
  * 封装 DeepSeek API 调用
  */
 export class AIService {
@@ -26,8 +46,8 @@ export class AIService {
    */
   static async chat(messages: ChatMessage[]): Promise<string> {
     try {
-      if (!import.meta.env.VITE_DEEPSEEK_API_KEY) {
-        throw new Error('API Key 未配置，请在 .env 文件中设置 VITE_DEEPSEEK_API_KEY')
+      if (!process.env.VITE_DEEPSEEK_API_KEY) {
+        throw new Error('API Key 未配置，请在环境变量中设置 VITE_DEEPSEEK_API_KEY')
       }
 
       const messagesWithSystemPrompt: Array<ChatMessage> = [

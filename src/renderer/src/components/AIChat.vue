@@ -100,8 +100,14 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted } from 'vue'
-import { AIService, type ChatMessage as AIChatMessage } from '../../../services/aiService'
-import { ChatStorage, type ChatMessage } from '../../../services/chatStorage'
+
+// 消息数据结构
+interface ChatMessage {
+  id?: number
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: number
+}
 
 // 消息列表
 const messages = ref<ChatMessage[]>([])
@@ -146,9 +152,9 @@ const handleSend = async () => {
     timestamp: Date.now(),
   }
 
-  // 保存用户消息到 IndexedDB
+  // 保存用户消息到后端（SQLite）
   try {
-    await ChatStorage.saveMessage(userMessage)
+    await window.api.chat.saveMessage(userMessage)
   } catch (error) {
     console.error('保存用户消息失败:', error)
     errorMessage.value = '保存消息失败，请重试'
@@ -158,7 +164,7 @@ const handleSend = async () => {
   // 添加到消息列表
   const savedUserMessage: ChatMessage = {
     ...userMessage,
-    id: Date.now(), // 临时 ID，实际会从 IndexedDB 获取
+    id: Date.now(), // 临时 ID，实际会从后端获取
   }
   messages.value.push(savedUserMessage)
 
@@ -178,13 +184,13 @@ const handleSend = async () => {
 
   try {
     // 构建消息历史（用于 AI 调用）
-    const chatHistory: AIChatMessage[] = messages.value.map(msg => ({
+    const chatHistory = messages.value.map(msg => ({
       role: msg.role,
       content: msg.content,
     }))
 
-    // 调用 AI 服务
-    const aiResponse = await AIService.chat(chatHistory)
+    // 调用后端 AI 服务
+    const aiResponse = await window.api.ai.chat(chatHistory)
 
     // 创建 AI 消息
     const aiMessage: Omit<ChatMessage, 'id'> = {
@@ -193,8 +199,8 @@ const handleSend = async () => {
       timestamp: Date.now(),
     }
 
-    // 保存 AI 消息到 IndexedDB
-    await ChatStorage.saveMessage(aiMessage)
+    // 保存 AI 消息到后端（SQLite）
+    await window.api.chat.saveMessage(aiMessage)
 
     // 添加到消息列表
     const savedAiMessage: ChatMessage = {
@@ -225,7 +231,7 @@ const scrollToBottom = () => {
 // 加载历史记录
 const loadHistory = async () => {
   try {
-    const historyMessages = await ChatStorage.getAllMessages()
+    const historyMessages = await window.api.chat.getAllMessages()
     messages.value = historyMessages
     // 加载后滚动到底部
     scrollToBottom()

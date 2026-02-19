@@ -2,6 +2,8 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { ChatStorage } from './services/chatStorage'
+import { AIService } from './services/aiService'
 
 function createWindow(): void {
   // Create the browser window.
@@ -35,6 +37,56 @@ function createWindow(): void {
   }
 }
 
+// 设置IPC处理程序
+function setupIpcHandlers() {
+  // 聊天存储相关IPC
+  ipcMain.handle('chat:saveMessage', async (_, message) => {
+    try {
+      return await ChatStorage.saveMessage(message)
+    } catch (error) {
+      console.error('保存消息失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('chat:getAllMessages', async () => {
+    try {
+      return await ChatStorage.getAllMessages()
+    } catch (error) {
+      console.error('获取消息失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('chat:clearMessages', async () => {
+    try {
+      return await ChatStorage.clearMessages()
+    } catch (error) {
+      console.error('清空消息失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('chat:deleteMessage', async (_, id) => {
+    try {
+      return await ChatStorage.deleteMessage(id)
+    } catch (error) {
+      console.error('删除消息失败:', error)
+      throw error
+    }
+  })
+
+  // AI服务相关IPC
+  ipcMain.handle('ai:chat', async (_, messages) => {
+    try {
+      return await AIService.chat(messages)
+    } catch (error) {
+      console.error('AI聊天失败:', error)
+      throw error
+    }
+  })
+}
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -48,6 +100,9 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+
+  // 设置IPC处理程序
+  setupIpcHandlers()
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))

@@ -1,8 +1,20 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
-const api = {}
+const api = {
+  // 聊天存储相关API
+  chat: {
+    saveMessage: (message: any) => ipcRenderer.invoke('chat:saveMessage', message),
+    getAllMessages: () => ipcRenderer.invoke('chat:getAllMessages'),
+    clearMessages: () => ipcRenderer.invoke('chat:clearMessages'),
+    deleteMessage: (id: number) => ipcRenderer.invoke('chat:deleteMessage', id)
+  },
+  // AI服务相关API
+  ai: {
+    chat: (messages: any[]) => ipcRenderer.invoke('ai:chat', messages)
+  }
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
