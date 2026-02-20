@@ -50,18 +50,18 @@ function setupIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle('chat:getAllMessages', async () => {
+  ipcMain.handle('chat:getAllMessages', async (_, paperId) => {
     try {
-      return await ChatStorage.getAllMessages()
+      return await ChatStorage.getAllMessages(paperId)
     } catch (error) {
       console.error('获取消息失败:', error)
       throw error
     }
   })
 
-  ipcMain.handle('chat:clearMessages', async () => {
+  ipcMain.handle('chat:clearMessages', async (_, paperId) => {
     try {
-      return await ChatStorage.clearMessages()
+      return await ChatStorage.clearMessages(paperId)
     } catch (error) {
       console.error('清空消息失败:', error)
       throw error
@@ -149,8 +149,8 @@ function setupIpcHandlers(): void {
   // PDF文件读取相关IPC（用于解决本地文件加载问题）
   ipcMain.handle('paper:readPDF', async (_, path) => {
     try {
-      const fs = require('fs')
-      const data = fs.readFileSync(path)
+      const fs = await import('fs/promises')
+      const data = await fs.readFile(path)
       return Array.from(data)
     } catch (error) {
       console.error('读取PDF文件失败:', error)

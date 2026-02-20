@@ -12,7 +12,7 @@
       <PaperReader :selected-paper="selectedPaper" />
     </div>
     <div class="panel">
-      <AIChat />
+      <AIChat :selected-paper="selectedPaper" />
     </div>
   </div>
 </template>

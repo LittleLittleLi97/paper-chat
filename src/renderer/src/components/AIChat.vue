@@ -132,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted } from 'vue'
+import { ref, computed, nextTick, onMounted, watch } from 'vue'
 
 // 消息数据结构
 interface ChatMessage {
@@ -140,7 +140,23 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp: number
+  paperId?: number
 }
+
+// 论文数据结构
+interface Paper {
+  id: number
+  title: string
+  content?: string
+  path: string
+}
+
+// Props
+interface Props {
+  selectedPaper: Paper | null
+}
+
+const props = defineProps<Props>()
 
 // 消息列表
 const messages = ref<ChatMessage[]>([])
@@ -182,7 +198,8 @@ const handleSend = async () => {
   const userMessage: Omit<ChatMessage, 'id'> = {
     role: 'user',
     content: userContent,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    paperId: props.selectedPaper?.id || 0
   }
 
   // 保存用户消息到后端（SQLite）
@@ -229,7 +246,8 @@ const handleSend = async () => {
     const aiMessage: Omit<ChatMessage, 'id'> = {
       role: 'assistant',
       content: aiResponse,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      paperId: props.selectedPaper?.id || 0
     }
 
     // 保存 AI 消息到后端（SQLite）
@@ -262,9 +280,9 @@ const scrollToBottom = () => {
 }
 
 // 加载历史记录
-const loadHistory = async () => {
+const loadHistory = async (paperId: number = 0) => {
   try {
-    const historyMessages = await window.api.chat.getAllMessages()
+    const historyMessages = await window.api.chat.getAllMessages(paperId)
     messages.value = historyMessages
     // 加载后滚动到底部
     scrollToBottom()
@@ -274,9 +292,18 @@ const loadHistory = async () => {
   }
 }
 
+// 监听 selectedPaper 变化
+watch(() => props.selectedPaper, (newPaper) => {
+  if (newPaper) {
+    loadHistory(newPaper.id)
+  } else {
+    loadHistory(0)
+  }
+}, { immediate: true })
+
 // 组件挂载时加载历史记录
 onMounted(() => {
-  loadHistory()
+  loadHistory(props.selectedPaper?.id || 0)
 })
 </script>
 

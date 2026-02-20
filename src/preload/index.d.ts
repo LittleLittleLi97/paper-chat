@@ -4,8 +4,8 @@ declare global {
     api: {
       chat: {
         saveMessage: (message: Omit<ChatMessage, 'id'>) => Promise<number>
-        getAllMessages: () => Promise<ChatMessage[]>
-        clearMessages: () => Promise<void>
+        getAllMessages: (paperId?: number) => Promise<ChatMessage[]>
+        clearMessages: (paperId?: number) => Promise<void>
         deleteMessage: (id: number) => Promise<void>
       }
       ai: {
@@ -32,6 +32,7 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp: number
+  paperId?: number
 }
 
 interface Paper {

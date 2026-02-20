@@ -5,9 +5,9 @@ import { electronAPI } from '@electron-toolkit/preload'
 const api = {
   // 聊天存储相关API
   chat: {
-    saveMessage: (message: { role: 'user' | 'assistant'; content: string; timestamp: number }) => ipcRenderer.invoke('chat:saveMessage', message),
-    getAllMessages: () => ipcRenderer.invoke('chat:getAllMessages'),
-    clearMessages: () => ipcRenderer.invoke('chat:clearMessages'),
+    saveMessage: (message: { role: 'user' | 'assistant'; content: string; timestamp: number; paperId?: number }) => ipcRenderer.invoke('chat:saveMessage', message),
+    getAllMessages: (paperId?: number) => ipcRenderer.invoke('chat:getAllMessages', paperId),
+    clearMessages: (paperId?: number) => ipcRenderer.invoke('chat:clearMessages', paperId),
     deleteMessage: (id: number) => ipcRenderer.invoke('chat:deleteMessage', id)
   },
   // AI服务相关API

@@ -47,7 +47,7 @@ export class AIService {
       }
 
       const messagesWithSystemPrompt: Array<ChatMessage> = [
-        { role: 'system', content: systemPrompt },
+        // { role: 'system', content: systemPrompt }, // 暂时不添加系统提示
         ...messages
       ]
 

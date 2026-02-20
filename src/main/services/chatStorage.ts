@@ -7,6 +7,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp: number
+  paperId?: number
 }
 
 /**
@@ -36,8 +37,14 @@ export class ChatStorage {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         role TEXT NOT NULL,
         content TEXT NOT NULL,
-        timestamp INTEGER NOT NULL
+        timestamp INTEGER NOT NULL,
+        paper_id INTEGER DEFAULT 0
       )
+    `)
+
+    // 添加索引以提高查询性能
+    await this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_messages_paper_id ON messages (paper_id)
     `)
 
     return this.db
@@ -50,27 +57,32 @@ export class ChatStorage {
   static async saveMessage(message: Omit<ChatMessage, 'id'>): Promise<number> {
     const db = await this.initDB()
     const result = await db.run(
-      'INSERT INTO messages (role, content, timestamp) VALUES (?, ?, ?)',
-      [message.role, message.content, message.timestamp || Date.now()]
+      'INSERT INTO messages (role, content, timestamp, paper_id) VALUES (?, ?, ?, ?)',
+      [message.role, message.content, message.timestamp || Date.now(), message.paperId || 0]
     )
     return result.lastID as number
   }
 
   /**
-   * 获取所有消息（按时间排序）
+   * 获取指定论文的所有消息（按时间排序）
+   * @param paperId 论文 ID
    */
-  static async getAllMessages(): Promise<ChatMessage[]> {
+  static async getAllMessages(paperId: number = 0): Promise<ChatMessage[]> {
     const db = await this.initDB()
-    const messages = await db.all<ChatMessage[]>('SELECT * FROM messages ORDER BY timestamp ASC')
+    const messages = await db.all<ChatMessage[]>(
+      'SELECT * FROM messages WHERE paper_id = ? ORDER BY timestamp ASC',
+      [paperId]
+    )
     return messages
   }
 
   /**
-   * 清空所有消息
+   * 清空指定论文的所有消息
+   * @param paperId 论文 ID
    */
-  static async clearMessages(): Promise<void> {
+  static async clearMessages(paperId: number = 0): Promise<void> {
     const db = await this.initDB()
-    await db.run('DELETE FROM messages')
+    await db.run('DELETE FROM messages WHERE paper_id = ?', [paperId])
   }
 
   /**
