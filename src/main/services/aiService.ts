@@ -27,7 +27,6 @@ try {
 const openai = new OpenAI({
   baseURL: 'https://api.deepseek.com',
   apiKey: process.env.VITE_DEEPSEEK_API_KEY,
-  dangerouslyAllowBrowser: false // 后端不需要这个选项
 })
 
 /**

@@ -147,10 +147,11 @@ function setupIpcHandlers(): void {
   })
 
   // PDF文件读取相关IPC（用于解决本地文件加载问题）
-  ipcMain.handle('paper:readPDF', async (_, path) => {
+  ipcMain.handle('paper:readPDF', async (_, path: string) => {
     try {
       const fs = await import('fs/promises')
       const data = await fs.readFile(path)
+      await PaperStorage.processPDFVectorization(path)
       return Array.from(data)
     } catch (error) {
       console.error('读取PDF文件失败:', error)

@@ -1,5 +1,10 @@
 import sqlite3 from 'sqlite3'
 import { open, Database } from 'sqlite'
+import { MemoryVectorStore } from "@langchain/classic/vectorstores/memory";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { PDFParse } from "pdf-parse";
+import fs from 'fs'
 
 /**
  * PDF文件数据结构
@@ -17,6 +22,7 @@ export interface Paper {
  */
 export class PaperStorage {
   private static db: Database | null = null
+  static vectorStore: MemoryVectorStore | null = null
 
   /**
    * 初始化数据库
@@ -88,6 +94,43 @@ export class PaperStorage {
     } catch (error) {
       console.error('获取PDF文件失败:', error)
       throw error
+    }
+  }
+
+  /**
+   * 处理PDF文本的向量化
+   * @param path PDF文件路径
+   */
+  static async processPDFVectorization(path: string): Promise<void> {
+    try {
+      // 读取PDF文件内容
+      const buffer = fs.readFileSync(path);
+
+      const parser = new PDFParse({
+        data: buffer
+      });
+
+      const content = await parser.getText();
+      console.log('===', content)
+
+      // 使用@langchain/textsplitters进行文本分割
+      const splitter = new RecursiveCharacterTextSplitter({
+        chunkSize: 1000,
+        chunkOverlap: 200
+      })
+      const chunks = await splitter.splitText(content.text)
+      console.log('=== chunks', chunks)
+
+      // 使用OpenAI进行向量化（如果需要其他嵌入模型可以替换）
+      const embeddings = new OpenAIEmbeddings()
+      console.log('=== embeddings', embeddings)
+
+      this.vectorStore = await MemoryVectorStore.fromTexts(chunks, [], embeddings)
+
+      console.log('PDF向量化完成，生成了', chunks.length, '个文本块')
+    } catch (error) {
+      console.error('PDF向量化失败:', error)
+      this.vectorStore = null
     }
   }
 
