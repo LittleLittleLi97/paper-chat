@@ -3,6 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import dotenv from 'dotenv'
 import { app } from 'electron'
+import { ChatModalConfig } from '../config'
 
 // 加载.env文件中的环境变量
 dotenv.config()
@@ -25,8 +26,8 @@ try {
 
 // 初始化 OpenAI 客户端
 const openai = new OpenAI({
-  baseURL: 'https://api.deepseek.com',
-  apiKey: process.env.VITE_DEEPSEEK_API_KEY,
+  baseURL: ChatModalConfig.baseURL,
+  apiKey: ChatModalConfig.apiKey,
 })
 
 /**
@@ -51,7 +52,7 @@ export class AIService {
       ]
 
       const completion = await openai.chat.completions.create({
-        model: 'deepseek-chat',
+        model: ChatModalConfig.model,
         messages: messagesWithSystemPrompt
       })
 

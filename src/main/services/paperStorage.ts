@@ -5,6 +5,7 @@ import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { PDFParse } from "pdf-parse";
 import fs from 'fs'
+import { EmbeddingModalConfig } from '../config';
 
 /**
  * PDF文件数据结构
@@ -122,14 +123,19 @@ export class PaperStorage {
       console.log('=== chunks', chunks)
 
       // 使用OpenAI进行向量化（如果需要其他嵌入模型可以替换）
-      const embeddings = new OpenAIEmbeddings()
-      console.log('=== embeddings', embeddings)
-
+      const embeddings = new OpenAIEmbeddings({
+        configuration: {
+          baseURL: EmbeddingModalConfig.baseURL,
+          apiKey: EmbeddingModalConfig.apiKey
+        },
+        model: EmbeddingModalConfig.model
+      })
+      
       this.vectorStore = await MemoryVectorStore.fromTexts(chunks, [], embeddings)
 
-      console.log('PDF向量化完成，生成了', chunks.length, '个文本块')
+      console.log('PDF vector OK, chunks length = ', chunks.length)
     } catch (error) {
-      console.error('PDF向量化失败:', error)
+      console.error('PDF vector failed:', error)
       this.vectorStore = null
     }
   }
