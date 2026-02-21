@@ -151,7 +151,7 @@ function setupIpcHandlers(): void {
     try {
       const fs = await import('fs/promises')
       const data = await fs.readFile(path)
-      await PaperStorage.processPDFVectorization(path)
+      await AIService.processPDFVectorization(path)
       return Array.from(data)
     } catch (error) {
       console.error('读取PDF文件失败:', error)
