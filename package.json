@@ -25,6 +25,7 @@
     "@electron-toolkit/utils": "^4.0.0",
     "@langchain/community": "^1.1.16",
     "@langchain/core": "^1.1.26",
+    "@langchain/deepseek": "^1.0.13",
     "@langchain/ollama": "^1.2.3",
     "@langchain/openai": "^1.2.8",
     "@langchain/textsplitters": "^1.0.1",

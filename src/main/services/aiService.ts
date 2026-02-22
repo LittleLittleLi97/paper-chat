@@ -1,13 +1,15 @@
-import OpenAI from 'openai'
 import fs from 'fs'
 import path from 'path'
 import dotenv from 'dotenv'
 import { app } from 'electron'
-import { ChatModalConfig, EmbeddingModalConfig } from '../config'
 import { MemoryVectorStore } from "@langchain/classic/vectorstores/memory";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { PDFParse } from "pdf-parse";
+import { retrieveTool } from './tools'
+import { createAgent } from "langchain";
+import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
+import { ChatDeepSeek } from "@langchain/deepseek";
 
 // 加载.env文件中的环境变量
 dotenv.config()
@@ -29,9 +31,29 @@ try {
 }
 
 // 初始化 OpenAI 客户端
-const openai = new OpenAI({
-  baseURL: ChatModalConfig.baseURL,
-  apiKey: ChatModalConfig.apiKey,
+const deepseek = new ChatDeepSeek({
+  model: 'deepseek-chat',
+  configuration: {
+    baseURL: 'https://api.deepseek.com',
+  },
+})
+
+const agent = createAgent({
+  model: deepseek,
+  tools: [retrieveTool],
+})
+
+const embeddings = new OpenAIEmbeddings({
+  configuration: {
+    baseURL: 'https://openrouter.ai/api/v1',
+    apiKey: process.env.OPENROUTER_API_KEY
+  },
+  model: 'qwen/qwen3-embedding-8b'
+})
+
+const splitter = new RecursiveCharacterTextSplitter({
+  chunkSize: 1000,
+  chunkOverlap: 200
 })
 
 /**
@@ -48,26 +70,38 @@ export class AIService {
    */
   static async chat(messages: ChatMessage[]): Promise<string> {
     try {
-      if (!process.env.VITE_DEEPSEEK_API_KEY) {
-        throw new Error('API Key 未配置，请在环境变量中设置 VITE_DEEPSEEK_API_KEY')
-      }
 
       const messagesWithSystemPrompt: Array<ChatMessage> = [
-        // { role: 'system', content: systemPrompt }, // 暂时不添加系统提示
-        ...messages
+      // { role: 'system', content: systemPrompt }, // 暂时不添加系统提示
+      ...messages
       ]
 
-      const completion = await openai.chat.completions.create({
-        model: ChatModalConfig.model,
-        messages: messagesWithSystemPrompt
+      // 转换为 LangChain 消息格式
+      const langchainMessages = messagesWithSystemPrompt.map(msg => {
+        switch (msg.role) {
+          case 'user':
+            return new HumanMessage(msg.content)
+          case 'assistant':
+            return new AIMessage(msg.content)
+          case 'system':
+            return new SystemMessage(msg.content)
+          default:
+            return new HumanMessage(msg.content)
+        }
       })
 
-      const content = completion.choices[0]?.message?.content
+      // 使用agent代替直接调用OpenAI API
+      const result = await agent.invoke({
+        messages: langchainMessages,
+      })
+
+      const content = result.messages[result.messages.length - 1].content
+
       if (!content) {
         throw new Error('AI 返回了空内容')
       }
 
-      return content
+      return content as string
     } catch (error) {
       console.error('AI 服务调用失败:', error)
 
@@ -100,24 +134,7 @@ export class AIService {
       });
 
       const content = await parser.getText();
-      console.log('===', content)
-
-      // 使用@langchain/textsplitters进行文本分割
-      const splitter = new RecursiveCharacterTextSplitter({
-        chunkSize: 1000,
-        chunkOverlap: 200
-      })
       const chunks = await splitter.splitText(content.text)
-      console.log('=== chunks', chunks)
-
-      // 使用OpenAI进行向量化（如果需要其他嵌入模型可以替换）
-      const embeddings = new OpenAIEmbeddings({
-        configuration: {
-          baseURL: EmbeddingModalConfig.baseURL,
-          apiKey: EmbeddingModalConfig.apiKey
-        },
-        model: EmbeddingModalConfig.model
-      })
       
       this.vectorStore = await MemoryVectorStore.fromTexts(chunks, [], embeddings)
 
