@@ -2,10 +2,6 @@ import fs from 'fs'
 import path from 'path'
 import dotenv from 'dotenv'
 import { app } from 'electron'
-import { MemoryVectorStore } from "@langchain/classic/vectorstores/memory";
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
-import { OpenAIEmbeddings } from "@langchain/openai";
-import { PDFParse } from "pdf-parse";
 import { retrieveTool } from './tools'
 import { createAgent } from "langchain";
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
@@ -43,25 +39,11 @@ const agent = createAgent({
   tools: [retrieveTool],
 })
 
-const embeddings = new OpenAIEmbeddings({
-  configuration: {
-    baseURL: 'https://openrouter.ai/api/v1',
-    apiKey: process.env.OPENROUTER_API_KEY
-  },
-  model: 'qwen/qwen3-embedding-8b'
-})
-
-const splitter = new RecursiveCharacterTextSplitter({
-  chunkSize: 1000,
-  chunkOverlap: 200
-})
-
 /**
  * AI 服务类（后端）
  * 封装 DeepSeek API 调用
  */
 export class AIService {
-  static vectorStore: MemoryVectorStore | null = null
 
   /**
    * 发送聊天消息并获取 AI 回复
@@ -120,28 +102,4 @@ export class AIService {
     }
   }
 
-  /**
-   * 处理PDF文本的向量化
-   * @param path PDF文件路径
-   */
-  static async processPDFVectorization(path: string): Promise<void> {
-    try {
-      // 读取PDF文件内容
-      const buffer = fs.readFileSync(path);
-
-      const parser = new PDFParse({
-        data: buffer
-      });
-
-      const content = await parser.getText();
-      const chunks = await splitter.splitText(content.text)
-      
-      this.vectorStore = await MemoryVectorStore.fromTexts(chunks, [], embeddings)
-
-      console.log('PDF vector OK, chunks length = ', chunks.length)
-    } catch (error) {
-      console.error('PDF vector failed:', error)
-      this.vectorStore = null
-    }
-  }
 }

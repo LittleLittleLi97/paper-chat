@@ -5,6 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import { ChatStorage } from './services/chatStorage'
 import { AIService } from './services/aiService'
 import { PaperStorage } from './services/paperStorage'
+import { RAGService } from './services/ragService'
 
 function createWindow(): void {
   // Create the browser window.
@@ -139,6 +140,7 @@ function setupIpcHandlers(): void {
 
   ipcMain.handle('paper:deletePaper', async (_, id) => {
     try {
+      await RAGService.removePaper(id)
       return await PaperStorage.deletePaper(id)
     } catch (error) {
       console.error('删除PDF文件失败:', error)
@@ -151,10 +153,19 @@ function setupIpcHandlers(): void {
     try {
       const fs = await import('fs/promises')
       const data = await fs.readFile(path)
-      await AIService.processPDFVectorization(path)
       return Array.from(data)
     } catch (error) {
       console.error('读取PDF文件失败:', error)
+      throw error
+    }
+  })
+
+  // RAG 相关IPC
+  ipcMain.handle('rag:addPaper', async (_, paperId: number, pdfPath: string) => {
+    try {
+      await RAGService.addPaper(paperId, pdfPath)
+    } catch (error) {
+      console.error('论文向量化失败:', error)
       throw error
     }
   })
@@ -163,7 +174,7 @@ function setupIpcHandlers(): void {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
@@ -173,6 +184,13 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+
+  // 初始化 RAG 服务（启动 ChromaDB 子进程）
+  try {
+    await RAGService.init()
+  } catch (error) {
+    console.error('RAGService init failed:', error)
+  }
 
   // 设置IPC处理程序
   setupIpcHandlers()
@@ -192,6 +210,10 @@ app.whenReady().then(() => {
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
+app.on('before-quit', async () => {
+  await RAGService.shutdown()
+})
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()

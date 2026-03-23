@@ -26,7 +26,6 @@ import AIChat from './components/AIChat.vue'
 interface Paper {
   id: number
   title: string
-  content?: string
   path: string
 }
 
@@ -49,11 +48,14 @@ const addPaper = async (): Promise<void> => {
         // 创建新的paper对象（不包含id，由数据库自动生成）
         const newPaper: Omit<Paper, 'id'> = {
           title,
-          content: '', // PDF内容暂时为空
           path
         }
         // 保存到数据库
         const id = await window.api.paper.savePaper(newPaper)
+        // 向量化论文内容（异步，不阻塞UI）
+        window.api.rag.addPaper(id, path).catch((err) => {
+          console.error(`论文向量化失败 (id=${id}):`, err)
+        })
         // 创建包含id的paper对象
         const paperWithId: Paper = {
           ...newPaper,

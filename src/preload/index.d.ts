@@ -23,6 +23,9 @@ declare global {
         deletePaper: (id: number) => Promise<void>
         readPDF: (path: string) => Promise<number[]>
       }
+      rag: {
+        addPaper: (paperId: number, pdfPath: string) => Promise<void>
+      }
     }
   }
 }
@@ -39,7 +42,6 @@ interface Paper {
   id: number
   title: string
   path: string
-  content?: string
 }
 
 export {}

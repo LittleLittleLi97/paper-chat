@@ -20,11 +20,15 @@ const api = {
   },
   // PDF文件存储相关API
   paper: {
-    savePaper: (paper: { title: string; content: string; path?: string }) => ipcRenderer.invoke('paper:savePaper', paper),
+    savePaper: (paper: { title: string; path: string }) => ipcRenderer.invoke('paper:savePaper', paper),
     getAllPapers: () => ipcRenderer.invoke('paper:getAllPapers'),
     getPaperById: (id: number) => ipcRenderer.invoke('paper:getPaperById', id),
     deletePaper: (id: number) => ipcRenderer.invoke('paper:deletePaper', id),
     readPDF: (path: string) => ipcRenderer.invoke('paper:readPDF', path)
+  },
+  // RAG 相关API
+  rag: {
+    addPaper: (paperId: number, pdfPath: string) => ipcRenderer.invoke('rag:addPaper', paperId, pdfPath)
   }
 }
 

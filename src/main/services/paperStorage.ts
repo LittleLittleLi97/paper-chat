@@ -8,7 +8,6 @@ export interface Paper {
   id: number
   title: string
   path: string
-  content?: string
 }
 
 /**
