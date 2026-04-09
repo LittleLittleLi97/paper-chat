@@ -13,7 +13,9 @@
       content="default-src 'self'; 
                connect-src 'self' https://api.deepseek.com https://api.deepseek.com; 
                script-src 'self'; 
-               style-src 'self' 'unsafe-inline';"
+               style-src 'self' 'unsafe-inline';
+               frame-src 'self' blob:;
+               object-src 'self' blob:;"
     />
   </head>
 
