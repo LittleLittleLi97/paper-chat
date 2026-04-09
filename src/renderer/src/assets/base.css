@@ -1,3 +1,52 @@
-* {
-  font-size: 22px;
+:root {
+  --bg-app: #eef2f8;
+  --bg-elevated: #ffffff;
+  --bg-panel: #f8faff;
+  --bg-panel-soft: #f2f6ff;
+  --bg-hover: #e9f0ff;
+  --bg-active: #dfe9ff;
+  --bg-input: #ffffff;
+  --text-primary: #1b2436;
+  --text-secondary: #34425f;
+  --text-muted: #6f7c96;
+  --border-subtle: #d6deee;
+  --border-strong: #bcc8df;
+  --accent: #4f7df2;
+  --accent-hover: #3e6be0;
+  --accent-strong: #2d5bd2;
+  --danger: #e25566;
+  --success: #22a36a;
+  --shadow-panel: 0 10px 24px rgba(43, 67, 112, 0.12);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --font-ui: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  background: radial-gradient(circle at top, #ffffff 0%, var(--bg-app) 58%);
+  color: var(--text-primary);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }

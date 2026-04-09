@@ -1,19 +1,30 @@
 <template>
   <div class="paper-list">
     <div class="paper-list-header">
-      <h3>论文列表</h3>
-      <button class="add-button" @click="addPaper">添加</button>
+      <div class="header-title-wrap">
+        <h3>文献库</h3>
+        <p>{{ papers.length }} 篇文献</p>
+      </div>
+      <button class="add-button" @click="addPaper">导入 PDF</button>
     </div>
-    <ul>
+
+    <ul v-if="papers.length > 0" class="paper-items">
       <li
         v-for="paper in papers"
         :key="paper.id"
         :class="{ active: selectedPaper && selectedPaper.id === paper.id }"
+        :title="paper.path"
         @click="selectPaper(paper)"
       >
-        {{ paper.title }}
+        <div class="paper-title">{{ paper.title }}</div>
+        <div class="paper-path">{{ paper.path }}</div>
       </li>
     </ul>
+
+    <div v-else class="empty-state">
+      <div class="empty-title">还没有文献</div>
+      <div class="empty-hint">点击右上角“导入 PDF”开始建立文献库</div>
+    </div>
   </div>
 </template>
 
@@ -49,66 +60,132 @@ const addPaper = (): void => {
 .paper-list {
   width: 100%;
   height: 100%;
-  background-color: #252526;
-  color: #cccccc;
-  padding: 10px;
-  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--bg-panel-soft) 76%, transparent);
 }
 
 .paper-list-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
+  align-items: flex-start;
+  gap: var(--space-3);
 }
 
-h3 {
+.header-title-wrap h3 {
   margin: 0;
-  color: #cccccc;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.header-title-wrap p {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.add-button {
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #eef4ff;
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.add-button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+
+.add-button:active {
+  transform: translateY(0);
+}
+
+.paper-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.paper-items::-webkit-scrollbar {
+  width: 8px;
+}
+
+.paper-items::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--border-strong) 82%, transparent);
+  border-radius: 10px;
+}
+
+.paper-items li {
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-panel) 82%, transparent);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.paper-items li:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--bg-hover) 78%, transparent);
+}
+
+.paper-items li.active {
+  border-color: color-mix(in srgb, var(--accent) 64%, transparent);
+  background: color-mix(in srgb, var(--bg-active) 78%, transparent);
+}
+
+.paper-title {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.paper-path {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty-state {
+  flex: 1;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  text-align: center;
+  padding: var(--space-4);
+}
+
+.empty-title {
+  color: var(--text-secondary);
   font-size: 14px;
   font-weight: 600;
 }
 
-.add-button {
-  background-color: #0e639c;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  padding: 4px 8px;
+.empty-hint {
   font-size: 12px;
-  cursor: pointer;
-  transition: background-color 0.1s;
-}
-
-.add-button:hover {
-  background-color: #1177bb;
-}
-
-.add-button:active {
-  background-color: #0c5a8a;
-}
-
-ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-li {
-  padding: 8px 10px;
-  cursor: pointer;
-  border-radius: 3px;
-  margin-bottom: 2px;
-  font-size: 13px;
-  transition: background-color 0.1s;
-}
-
-li:hover {
-  background-color: #37373d;
-}
-
-li.active {
-  background-color: #37373d;
-  border-left: 2px solid #007acc;
 }
 </style>

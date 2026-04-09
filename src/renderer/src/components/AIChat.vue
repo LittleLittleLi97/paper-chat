@@ -1,9 +1,12 @@
 <template>
   <div class="chat-container">
-    <!-- 消息列表区域 -->
+    <div class="chat-header">
+      <h3>AI 助手</h3>
+      <span class="chat-context">{{ selectedPaper ? selectedPaper.title : '通用会话' }}</span>
+    </div>
+
     <div class="messages-container" ref="messagesContainerRef">
       <div class="messages-list">
-        <!-- 真实消息列表 -->
         <div
           v-for="message in messages"
           :key="message.id"
@@ -41,7 +44,6 @@
           </div>
         </div>
 
-        <!-- 加载状态 -->
         <div v-if="isLoading" class="message-item ai-message">
           <div class="message-avatar">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -63,7 +65,6 @@
           </div>
         </div>
 
-        <!-- 错误消息 -->
         <div v-if="errorMessage" class="error-message-banner">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path
@@ -75,10 +76,9 @@
           <button @click="errorMessage = ''" class="error-close">×</button>
         </div>
 
-        <!-- 空状态提示 -->
         <div v-if="messages.length === 0 && !isLoading" class="empty-state">
           <div class="empty-icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
               <path
                 d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"
                 stroke="currentColor"
@@ -88,13 +88,12 @@
               />
             </svg>
           </div>
-          <div class="empty-text">开始与AI对话</div>
-          <div class="empty-hint">输入您的问题，AI将为您提供帮助</div>
+          <div class="empty-text">开始与 AI 对话</div>
+          <div class="empty-hint">你可以提问摘要、翻译、术语解释和阅读建议</div>
         </div>
       </div>
     </div>
 
-    <!-- 输入区域 -->
     <div class="input-container">
       <div class="input-wrapper">
         <textarea
@@ -134,7 +133,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, watch } from 'vue'
 
-// 消息数据结构
 interface ChatMessage {
   id?: number
   role: 'user' | 'assistant'
@@ -143,21 +141,18 @@ interface ChatMessage {
   paperId?: number
 }
 
-// 论文数据结构
 interface Paper {
   id: number
   title: string
   path: string
 }
 
-// Props
 interface Props {
   selectedPaper: Paper | null
 }
 
 const props = defineProps<Props>()
 
-// 消息列表
 const messages = ref<ChatMessage[]>([])
 const inputText = ref('')
 const messagesContainerRef = ref<HTMLDivElement | null>(null)
@@ -165,35 +160,28 @@ const inputRef = ref<HTMLTextAreaElement | null>(null)
 const isLoading = ref(false)
 const errorMessage = ref('')
 
-// 是否可以发送
 const canSend = computed(() => {
   return inputText.value.trim().length > 0 && !isLoading.value
 })
 
-// 处理输入
 const handleInput = (event: Event) => {
   const target = event.target as HTMLTextAreaElement
-  // 自动调整高度
   target.style.height = 'auto'
   target.style.height = `${Math.min(target.scrollHeight, 200)}px`
 }
 
-// 处理换行
 const handleNewLine = () => {
-  // Shift + Enter 时插入换行，不做任何处理
+  // Shift + Enter 时插入换行，不做额外处理
 }
 
-// 处理发送
 const handleSend = async () => {
   if (!canSend.value) return
 
   const userContent = inputText.value.trim()
   if (!userContent) return
 
-  // 清除错误消息
   errorMessage.value = ''
 
-  // 创建用户消息
   const userMessage: Omit<ChatMessage, 'id'> = {
     role: 'user',
     content: userContent,
@@ -201,7 +189,6 @@ const handleSend = async () => {
     paperId: props.selectedPaper?.id || 0
   }
 
-  // 保存用户消息到后端（SQLite）
   try {
     await window.api.chat.saveMessage(userMessage)
   } catch (error) {
@@ -210,38 +197,25 @@ const handleSend = async () => {
     return
   }
 
-  // 添加到消息列表
-  const savedUserMessage: ChatMessage = {
+  messages.value.push({
     ...userMessage,
-    id: Date.now() // 临时 ID，实际会从后端获取
-  }
-  messages.value.push(savedUserMessage)
+    id: Date.now()
+  })
 
-  // 清空输入框
   inputText.value = ''
-
-  // 重置输入框高度
   if (inputRef.value) {
     inputRef.value.style.height = 'auto'
   }
-
-  // 滚动到底部
   scrollToBottom()
 
-  // 设置加载状态
   isLoading.value = true
-
   try {
-    // 构建消息历史（用于 AI 调用）
     const chatHistory = messages.value.map((msg) => ({
       role: msg.role,
       content: msg.content
     }))
-
-    // 调用后端 AI 服务
     const aiResponse = await window.api.ai.chat(chatHistory)
 
-    // 创建 AI 消息
     const aiMessage: Omit<ChatMessage, 'id'> = {
       role: 'assistant',
       content: aiResponse,
@@ -249,17 +223,11 @@ const handleSend = async () => {
       paperId: props.selectedPaper?.id || 0
     }
 
-    // 保存 AI 消息到后端（SQLite）
     await window.api.chat.saveMessage(aiMessage)
-
-    // 添加到消息列表
-    const savedAiMessage: ChatMessage = {
+    messages.value.push({
       ...aiMessage,
-      id: Date.now() // 临时 ID
-    }
-    messages.value.push(savedAiMessage)
-
-    // 滚动到底部
+      id: Date.now()
+    })
     scrollToBottom()
   } catch (error) {
     console.error('AI 调用失败:', error)
@@ -269,7 +237,6 @@ const handleSend = async () => {
   }
 }
 
-// 滚动到底部
 const scrollToBottom = () => {
   nextTick(() => {
     if (messagesContainerRef.value) {
@@ -278,12 +245,10 @@ const scrollToBottom = () => {
   })
 }
 
-// 加载历史记录
 const loadHistory = async (paperId: number = 0) => {
   try {
     const historyMessages = await window.api.chat.getAllMessages(paperId)
     messages.value = historyMessages
-    // 加载后滚动到底部
     scrollToBottom()
   } catch (error) {
     console.error('加载历史记录失败:', error)
@@ -291,16 +256,18 @@ const loadHistory = async (paperId: number = 0) => {
   }
 }
 
-// 监听 selectedPaper 变化
-watch(() => props.selectedPaper, (newPaper) => {
-  if (newPaper) {
-    loadHistory(newPaper.id)
-  } else {
-    loadHistory(0)
-  }
-}, { immediate: true })
+watch(
+  () => props.selectedPaper,
+  (newPaper) => {
+    if (newPaper) {
+      loadHistory(newPaper.id)
+    } else {
+      loadHistory(0)
+    }
+  },
+  { immediate: true }
+)
 
-// 组件挂载时加载历史记录
 onMounted(() => {
   loadHistory(props.selectedPaper?.id || 0)
 })
@@ -310,37 +277,49 @@ onMounted(() => {
 .chat-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
   width: 100%;
-  background: #2d2d2d;
-  border-left: 1px solid #404040;
+  background: color-mix(in srgb, var(--bg-panel-soft) 76%, transparent);
   overflow: hidden;
 }
 
-/* 消息列表区域 */
+.chat-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.chat-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.chat-context {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .messages-container {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 16px;
-  background: #2d2d2d;
+  padding: var(--space-4);
 }
 
 .messages-container::-webkit-scrollbar {
   width: 8px;
 }
 
-.messages-container::-webkit-scrollbar-track {
-  background: #2d2d2d;
-}
-
 .messages-container::-webkit-scrollbar-thumb {
-  background: #404040;
-  border-radius: 4px;
-}
-
-.messages-container::-webkit-scrollbar-thumb:hover {
-  background: #505050;
+  background: color-mix(in srgb, var(--border-strong) 82%, transparent);
+  border-radius: 10px;
 }
 
 .messages-list {
@@ -348,11 +327,10 @@ onMounted(() => {
   margin: 0 auto;
 }
 
-/* 消息项 */
 .message-item {
   display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
   align-items: flex-start;
 }
 
@@ -361,107 +339,101 @@ onMounted(() => {
 }
 
 .message-avatar {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  background: #404040;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: #eef4ff;
   flex-shrink: 0;
 }
 
 .user-message .message-avatar {
-  background: #0066cc;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
 }
 
 .ai-message .message-avatar {
-  background: #404040;
+  background: color-mix(in srgb, var(--bg-hover) 90%, transparent);
+  color: var(--text-secondary);
 }
 
 .message-content {
   flex: 1;
   min-width: 0;
-  max-width: 80%;
+  max-width: 84%;
 }
 
-/* 消息气泡 */
 .message-bubble {
-  padding: 12px 16px;
-  border-radius: 8px;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
   word-wrap: break-word;
   line-height: 1.5;
+  border: 1px solid transparent;
 }
 
 .user-bubble {
-  background: #0066cc;
-  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #eef4ff;
   margin-left: auto;
-  border-bottom-right-radius: 4px;
 }
 
 .ai-bubble {
-  background: #404040;
-  color: #fff;
-  border-bottom-left-radius: 4px;
+  background: color-mix(in srgb, var(--bg-panel) 80%, transparent);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
 }
 
 .message-text {
   white-space: pre-wrap;
-  font-size: 14px;
+  font-size: 13px;
 }
 
-/* 空状态 */
 .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
   min-height: 300px;
-  color: #888;
+  color: var(--text-muted);
   text-align: center;
-  padding: 40px 20px;
+  padding: var(--space-6) var(--space-4);
 }
 
 .empty-icon {
-  color: #555;
-  margin-bottom: 16px;
+  color: color-mix(in srgb, var(--text-muted) 76%, transparent);
+  margin-bottom: var(--space-3);
 }
 
 .empty-text {
-  font-size: 18px;
-  color: #aaa;
-  margin-bottom: 8px;
-  font-weight: 500;
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-weight: 600;
 }
 
 .empty-hint {
-  font-size: 14px;
-  color: #777;
+  font-size: 12px;
 }
 
-/* 输入区域 */
 .input-container {
-  padding: 16px;
-  background: #2d2d2d;
-  border-top: 1px solid #404040;
+  padding: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .input-wrapper {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
-  background: #404040;
-  border: 1px solid #555;
-  border-radius: 8px;
-  padding: 8px 12px;
-  transition: border-color 0.2s;
+  gap: var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-input) 86%, transparent);
+  padding: 8px 10px;
+  transition: border-color 0.2s ease;
 }
 
 .input-wrapper:focus-within {
-  border-color: #0066cc;
+  border-color: color-mix(in srgb, var(--accent) 72%, transparent);
 }
 
 .message-input {
@@ -469,8 +441,8 @@ onMounted(() => {
   background: transparent;
   border: none;
   outline: none;
-  color: #fff;
-  font-size: 14px;
+  color: var(--text-primary);
+  font-size: 13px;
   line-height: 1.5;
   resize: none;
   max-height: 200px;
@@ -480,57 +452,43 @@ onMounted(() => {
 }
 
 .message-input::placeholder {
-  color: #888;
-}
-
-.message-input::-webkit-scrollbar {
-  width: 6px;
-}
-
-.message-input::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.message-input::-webkit-scrollbar-thumb {
-  background: #555;
-  border-radius: 3px;
+  color: var(--text-muted);
 }
 
 .send-button {
   width: 32px;
   height: 32px;
-  border-radius: 6px;
-  background: #0066cc;
-  border: none;
-  color: #fff;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #eef4ff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: background 0.2s;
+  transition: filter 0.2s ease;
   padding: 0;
 }
 
 .send-button:hover:not(:disabled) {
-  background: #0052a3;
+  filter: brightness(1.08);
 }
 
 .send-button:disabled {
-  background: #404040;
-  color: #666;
+  background: color-mix(in srgb, var(--bg-hover) 75%, transparent);
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
   cursor: not-allowed;
-  opacity: 0.5;
 }
 
 .input-hint {
   margin-top: 8px;
-  font-size: 12px;
-  color: #777;
+  font-size: 11px;
+  color: var(--text-muted);
   text-align: center;
 }
 
-/* 加载指示器 */
 .loading-indicator {
   display: flex;
   gap: 4px;
@@ -539,10 +497,10 @@ onMounted(() => {
 }
 
 .loading-indicator span {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #888;
+  background: var(--text-muted);
   animation: loading-bounce 1.4s infinite ease-in-out both;
 }
 
@@ -567,22 +525,17 @@ onMounted(() => {
   }
 }
 
-/* 错误消息横幅 */
 .error-message-banner {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  margin: 16px;
-  background: rgba(255, 107, 107, 0.1);
-  border: 1px solid #ff6b6b;
-  border-radius: 8px;
-  color: #ff6b6b;
-  font-size: 14px;
-}
-
-.error-message-banner svg {
-  flex-shrink: 0;
+  gap: var(--space-2);
+  padding: 10px 12px;
+  margin: var(--space-4);
+  background: color-mix(in srgb, var(--danger) 11%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 48%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 12px;
 }
 
 .error-message-banner span {
@@ -592,21 +545,13 @@ onMounted(() => {
 .error-close {
   background: transparent;
   border: none;
-  color: #ff6b6b;
-  font-size: 20px;
+  color: var(--danger);
+  font-size: 18px;
   line-height: 1;
   cursor: pointer;
   padding: 0;
   width: 20px;
   height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   border-radius: 4px;
-  transition: background 0.2s;
-}
-
-.error-close:hover {
-  background: rgba(255, 107, 107, 0.2);
 }
 </style>
