@@ -40,6 +40,9 @@
           <div class="message-content">
             <div :class="['message-bubble', message.role === 'user' ? 'user-bubble' : 'ai-bubble']">
               <div class="message-text">{{ message.content }}</div>
+              <div v-if="message.role === 'assistant' && selectedPaper" class="message-actions">
+                <button class="mini-action-btn" @click="saveAsNote(message)">存为笔记</button>
+              </div>
             </div>
           </div>
         </div>
@@ -94,7 +97,51 @@
       </div>
     </div>
 
+    <div v-if="selectedPaper" class="study-panel">
+      <div class="study-column">
+        <div class="study-title">阅读笔记</div>
+        <div v-if="notes.length === 0" class="study-empty">暂无笔记</div>
+        <div v-for="note in notes" :key="note.id" class="study-item">
+          <div class="study-item-content">{{ note.content }}</div>
+          <div class="study-item-meta">{{ formatTime(note.timestamp) }}</div>
+        </div>
+      </div>
+      <div class="study-column">
+        <div class="study-title-row">
+          <div class="study-title">术语卡片</div>
+          <button class="mini-action-btn" :disabled="isLoading" @click="generateTermCards">从会话生成</button>
+        </div>
+        <div v-if="termCards.length === 0" class="study-empty">暂无术语卡片</div>
+        <div v-for="card in termCards" :key="card.id" class="study-item">
+          <div class="study-item-content"><strong>{{ card.term }}</strong>：{{ card.definition }}</div>
+          <button class="review-btn" @click="markReviewed(card)">已复习 {{ card.reviewCount || 0 }}</button>
+        </div>
+      </div>
+    </div>
+
     <div class="input-container">
+      <div v-if="papers.length > 1" class="p1-toolbox">
+        <div class="p1-title">P1 工具</div>
+        <div class="compare-paper-list">
+          <label v-for="paper in papers" :key="paper.id" class="paper-check-item">
+            <input
+              type="checkbox"
+              :value="paper.id"
+              :checked="comparePaperIds.includes(paper.id)"
+              @change="toggleComparePaper(paper.id)"
+            />
+            <span>{{ paper.title }}</span>
+          </label>
+        </div>
+        <div class="p1-actions">
+          <button class="quick-action-btn" :disabled="isLoading" @click="runComparePapers">
+            多论文快速对比
+          </button>
+          <button class="quick-action-btn" :disabled="isLoading" @click="runBatchSummaries">
+            批量摘要卡片
+          </button>
+        </div>
+      </div>
       <div class="quick-actions">
         <button
           v-for="action in quickActions"
@@ -161,6 +208,7 @@ interface Paper {
 
 interface Props {
   selectedPaper: Paper | null
+  papers: Paper[]
   readingContext: {
     currentPage: number | null
     selectedText: string
@@ -169,12 +217,33 @@ interface Props {
 
 const props = defineProps<Props>()
 
+interface StudyNote {
+  id?: number
+  paperId: number
+  content: string
+  sourceMessage?: string
+  timestamp: number
+}
+
+interface TermCard {
+  id?: number
+  paperId: number
+  term: string
+  definition: string
+  reviewCount?: number
+  lastReviewedAt?: number | null
+  createdAt: number
+}
+
 const messages = ref<ChatMessage[]>([])
 const inputText = ref('')
 const messagesContainerRef = ref<HTMLDivElement | null>(null)
 const inputRef = ref<HTMLTextAreaElement | null>(null)
 const isLoading = ref(false)
 const errorMessage = ref('')
+const notes = ref<StudyNote[]>([])
+const termCards = ref<TermCard[]>([])
+const comparePaperIds = ref<number[]>([])
 
 const quickActions = [
   { id: 'quick-read', label: '3分钟速读', prompt: '请对当前论文做3分钟速读，包含研究问题、方法、核心贡献。' },
@@ -199,6 +268,10 @@ const contextSummary = computed((): string => {
   }
   return details.length ? `阅读上下文：${details.join('，')}` : ''
 })
+
+const formatTime = (timestamp: number): string => {
+  return new Date(timestamp).toLocaleString()
+}
 
 const handleInput = (event: Event): void => {
   const target = event.target as HTMLTextAreaElement
@@ -262,19 +335,7 @@ const handleSend = async (quickActionId?: string): Promise<void> => {
       }
     })
 
-    const aiMessage: Omit<ChatMessage, 'id'> = {
-      role: 'assistant',
-      content: aiResponse,
-      timestamp: Date.now(),
-      paperId: props.selectedPaper?.id || 0
-    }
-
-    await window.api.chat.saveMessage(aiMessage)
-    messages.value.push({
-      ...aiMessage,
-      id: Date.now()
-    })
-    scrollToBottom()
+    await appendAssistantMessage(aiResponse)
   } catch (error) {
     console.error('AI 调用失败:', error)
     errorMessage.value = error instanceof Error ? error.message : 'AI 服务调用失败，请稍后重试'
@@ -282,6 +343,134 @@ const handleSend = async (quickActionId?: string): Promise<void> => {
     isLoading.value = false
     pendingQuickAction.value = undefined
   }
+}
+
+const appendAssistantMessage = async (content: string): Promise<void> => {
+  const aiMessage: Omit<ChatMessage, 'id'> = {
+    role: 'assistant',
+    content,
+    timestamp: Date.now(),
+    paperId: props.selectedPaper?.id || 0
+  }
+  await window.api.chat.saveMessage(aiMessage)
+  messages.value.push({
+    ...aiMessage,
+    id: Date.now()
+  })
+  scrollToBottom()
+}
+
+const toggleComparePaper = (paperId: number): void => {
+  if (comparePaperIds.value.includes(paperId)) {
+    comparePaperIds.value = comparePaperIds.value.filter((id) => id !== paperId)
+    return
+  }
+  comparePaperIds.value = [...comparePaperIds.value, paperId]
+}
+
+const runComparePapers = async (): Promise<void> => {
+  if (comparePaperIds.value.length < 2) {
+    errorMessage.value = '请至少勾选 2 篇论文进行对比'
+    return
+  }
+  isLoading.value = true
+  errorMessage.value = ''
+  try {
+    const selected = props.papers.filter((paper) => comparePaperIds.value.includes(paper.id))
+    const userPrompt = `请对比以下论文：${selected.map((p) => p.title).join('、')}`
+    const userMessage: Omit<ChatMessage, 'id'> = {
+      role: 'user',
+      content: userPrompt,
+      timestamp: Date.now(),
+      paperId: props.selectedPaper?.id || 0
+    }
+    await window.api.chat.saveMessage(userMessage)
+    messages.value.push({ ...userMessage, id: Date.now() })
+
+    const result = await window.api.ai.comparePapers({
+      papers: selected.map((paper) => ({ id: paper.id, title: paper.title }))
+    })
+    await appendAssistantMessage(result)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '多论文对比失败'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const runBatchSummaries = async (): Promise<void> => {
+  if (comparePaperIds.value.length === 0) {
+    errorMessage.value = '请先勾选需要批量摘要的论文'
+    return
+  }
+  isLoading.value = true
+  errorMessage.value = ''
+  try {
+    const selected = props.papers.filter((paper) => comparePaperIds.value.includes(paper.id))
+    const userMessage: Omit<ChatMessage, 'id'> = {
+      role: 'user',
+      content: `请批量生成摘要卡片：${selected.map((p) => p.title).join('、')}`,
+      timestamp: Date.now(),
+      paperId: props.selectedPaper?.id || 0
+    }
+    await window.api.chat.saveMessage(userMessage)
+    messages.value.push({ ...userMessage, id: Date.now() })
+
+    const result = await window.api.ai.batchSummaries({
+      papers: selected.map((paper) => ({ id: paper.id, title: paper.title }))
+    })
+    await appendAssistantMessage(result)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '批量摘要失败'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const saveAsNote = async (message: ChatMessage): Promise<void> => {
+  if (!props.selectedPaper) return
+  try {
+    await window.api.study.saveNote({
+      paperId: props.selectedPaper.id,
+      content: message.content,
+      sourceMessage: 'assistant',
+      timestamp: Date.now()
+    })
+    await loadStudyAssets(props.selectedPaper.id)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '保存笔记失败'
+  }
+}
+
+const generateTermCards = async (): Promise<void> => {
+  if (!props.selectedPaper) return
+  isLoading.value = true
+  errorMessage.value = ''
+  try {
+    const cardDrafts = await window.api.ai.extractTermCards({
+      paper: { id: props.selectedPaper.id, title: props.selectedPaper.title },
+      messages: messages.value.map((item) => ({ role: item.role, content: item.content }))
+    })
+    await window.api.study.saveTermCards(
+      cardDrafts.map((card) => ({
+        paperId: props.selectedPaper!.id,
+        term: card.term,
+        definition: card.definition,
+        createdAt: Date.now()
+      }))
+    )
+    await loadStudyAssets(props.selectedPaper.id)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '生成术语卡片失败'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const markReviewed = async (card: TermCard): Promise<void> => {
+  if (!card.id || !props.selectedPaper) return
+  await window.api.study.markTermReviewed(card.id)
+  await loadStudyAssets(props.selectedPaper.id)
 }
 
 const runQuickAction = (actionId: (typeof quickActions)[number]['id']): void => {
@@ -319,13 +508,33 @@ const loadHistory = async (paperId: number = 0): Promise<void> => {
   }
 }
 
+const loadStudyAssets = async (paperId: number): Promise<void> => {
+  if (!paperId) {
+    notes.value = []
+    termCards.value = []
+    return
+  }
+  const [loadedNotes, loadedCards] = await Promise.all([
+    window.api.study.getNotes(paperId),
+    window.api.study.getTermCards(paperId)
+  ])
+  notes.value = loadedNotes
+  termCards.value = loadedCards
+}
+
 watch(
   () => props.selectedPaper,
   (newPaper) => {
     if (newPaper) {
       loadHistory(newPaper.id)
+      loadStudyAssets(newPaper.id)
+      if (!comparePaperIds.value.includes(newPaper.id)) {
+        comparePaperIds.value = [...comparePaperIds.value, newPaper.id]
+      }
     } else {
       loadHistory(0)
+      notes.value = []
+      termCards.value = []
     }
   },
   { immediate: true }
@@ -333,6 +542,9 @@ watch(
 
 onMounted(() => {
   loadHistory(props.selectedPaper?.id || 0)
+  if (props.selectedPaper?.id) {
+    loadStudyAssets(props.selectedPaper.id)
+  }
 })
 </script>
 
@@ -452,6 +664,22 @@ onMounted(() => {
   font-size: 13px;
 }
 
+.message-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mini-action-btn {
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-panel-soft) 86%, transparent);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -482,6 +710,106 @@ onMounted(() => {
 .input-container {
   padding: var(--space-4);
   border-top: 1px solid var(--border-subtle);
+}
+
+.study-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.study-column {
+  min-height: 0;
+}
+
+.study-title {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.study-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.study-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  margin-bottom: 8px;
+  background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
+}
+
+.study-item-content {
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.study-item-meta {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.study-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.review-btn {
+  margin-top: 6px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 3px 7px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.p1-toolbox {
+  margin-bottom: 10px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-panel-soft) 72%, transparent);
+}
+
+.p1-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.compare-paper-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  max-height: 90px;
+  overflow: auto;
+}
+
+.paper-check-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.p1-actions {
+  display: flex;
+  gap: var(--space-2);
 }
 
 .quick-actions {

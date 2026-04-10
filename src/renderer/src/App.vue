@@ -45,7 +45,7 @@
       ></div>
 
       <section class="panel panel-right">
-        <AIChat :selected-paper="selectedPaper" :reading-context="readingContext" />
+        <AIChat :selected-paper="selectedPaper" :papers="papers" :reading-context="readingContext" />
       </section>
     </main>
   </div>

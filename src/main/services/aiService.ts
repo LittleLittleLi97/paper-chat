@@ -3,6 +3,7 @@ import path from 'path'
 import dotenv from 'dotenv'
 import { app } from 'electron'
 import { createRetrieveTool } from './tools'
+import { RAGService } from './ragService'
 import { createAgent } from "langchain";
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import { ChatDeepSeek } from "@langchain/deepseek";
@@ -27,6 +28,30 @@ export interface ChatContext {
 export interface ChatRequest {
   messages: ChatMessage[]
   context?: ChatContext
+}
+
+export interface PaperRef {
+  id: number
+  title: string
+}
+
+export interface ComparePapersRequest {
+  papers: PaperRef[]
+  focus?: string
+}
+
+export interface BatchSummaryRequest {
+  papers: PaperRef[]
+}
+
+export interface TermCardDraft {
+  term: string
+  definition: string
+}
+
+export interface ExtractTermCardsRequest {
+  paper: PaperRef
+  messages: ChatMessage[]
 }
 
 // 读取系统提示
@@ -163,4 +188,112 @@ export class AIService {
     }
   }
 
+  static async comparePapers(request: ComparePapersRequest): Promise<string> {
+    if (!request.papers || request.papers.length < 2) {
+      throw new Error('至少选择2篇论文才能进行对比')
+    }
+
+    const focus = request.focus?.trim() || '请做论文多维对比'
+    const snippets = await Promise.all(
+      request.papers.map(async (paper) => {
+        const docs = await RAGService.search(focus, 3, { paperId: paper.id })
+        const joined = docs
+          .map((doc, idx) => `(${idx + 1}) ${doc.pageContent}`)
+          .join('\n')
+        return `论文: ${paper.title} (paperId=${paper.id})\n${joined || '无可用片段'}`
+      })
+    )
+
+    const comparePrompt = [
+      `任务: ${focus}`,
+      '请输出“问题-方法-数据集-结论-局限”对照，尽量用表格。',
+      '若某项缺失，明确写“未检索到”。',
+      '',
+      '资料片段如下:',
+      snippets.join('\n\n---\n\n')
+    ].join('\n')
+
+    const result = await deepseek.invoke([
+      new SystemMessage(`${systemPrompt}\n你是论文对比助手，输出必须清晰可读。`),
+      new HumanMessage(comparePrompt)
+    ])
+
+    return toTextContent(result.content)
+  }
+
+  static async batchSummaries(request: BatchSummaryRequest): Promise<string> {
+    if (!request.papers || request.papers.length === 0) {
+      throw new Error('请至少选择1篇论文进行批量摘要')
+    }
+
+    const cards = await Promise.all(
+      request.papers.map(async (paper) => {
+        const docs = await RAGService.search('总结研究问题 方法 数据集 关键结论 局限', 3, {
+          paperId: paper.id
+        })
+        const joined = docs.map((doc) => doc.pageContent).join('\n')
+        const prompt = [
+          `论文: ${paper.title} (paperId=${paper.id})`,
+          '请输出以下字段：',
+          '- 摘要卡片：3-5条',
+          '- 关键词：3-6个，以逗号分隔',
+          '- 方法标签：1个短语',
+          '',
+          joined || '无可用片段'
+        ].join('\n')
+        const response = await deepseek.invoke([
+          new SystemMessage(`${systemPrompt}\n你是论文摘要助手，输出精炼。`),
+          new HumanMessage(prompt)
+        ])
+        return `## ${paper.title}\n${toTextContent(response.content)}`
+      })
+    )
+
+    return cards.join('\n\n')
+  }
+
+  static async extractTermCards(request: ExtractTermCardsRequest): Promise<TermCardDraft[]> {
+    if (!request.paper?.id) {
+      throw new Error('术语卡片生成失败：缺少论文信息')
+    }
+
+    const contextText = request.messages
+      .slice(-12)
+      .map((msg) => `${msg.role}: ${msg.content}`)
+      .join('\n')
+
+    const docs = await RAGService.search('术语 定义 方法 概念', 4, { paperId: request.paper.id })
+    const retrieval = docs.map((doc) => doc.pageContent).join('\n')
+    const prompt = [
+      `论文: ${request.paper.title} (paperId=${request.paper.id})`,
+      '请提取5-8个关键术语，逐行返回，严格格式：术语|定义',
+      '不要加序号，不要加其他说明。',
+      '',
+      '会话上下文：',
+      contextText,
+      '',
+      '检索片段：',
+      retrieval
+    ].join('\n')
+
+    const response = await deepseek.invoke([
+      new SystemMessage(`${systemPrompt}\n你是术语卡片生成器。`),
+      new HumanMessage(prompt)
+    ])
+    const raw = toTextContent(response.content)
+    const cards: TermCardDraft[] = raw
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.includes('|'))
+      .map((line) => {
+        const [term, ...rest] = line.split('|')
+        return {
+          term: (term || '').trim(),
+          definition: rest.join('|').trim()
+        }
+      })
+      .filter((card) => card.term && card.definition)
+
+    return cards
+  }
 }

@@ -21,7 +21,15 @@ const api = {
         selectedText?: string
         quickAction?: string
       }
-    }) => ipcRenderer.invoke('ai:chat', payload)
+    }) => ipcRenderer.invoke('ai:chat', payload),
+    comparePapers: (payload: { papers: Array<{ id: number; title: string }>; focus?: string }) =>
+      ipcRenderer.invoke('ai:comparePapers', payload),
+    batchSummaries: (payload: { papers: Array<{ id: number; title: string }> }) =>
+      ipcRenderer.invoke('ai:batchSummaries', payload),
+    extractTermCards: (payload: {
+      paper: { id: number; title: string }
+      messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
+    }) => ipcRenderer.invoke('ai:extractTermCards', payload)
   },
   // 文件选择相关API
   file: {
@@ -38,6 +46,19 @@ const api = {
   // RAG 相关API
   rag: {
     addPaper: (paperId: number, pdfPath: string) => ipcRenderer.invoke('rag:addPaper', paperId, pdfPath)
+  },
+  study: {
+    saveNote: (payload: {
+      paperId: number
+      content: string
+      sourceMessage?: string
+      timestamp: number
+    }) => ipcRenderer.invoke('study:saveNote', payload),
+    getNotes: (paperId: number) => ipcRenderer.invoke('study:getNotes', paperId),
+    saveTermCards: (cards: Array<{ paperId: number; term: string; definition: string; createdAt: number }>) =>
+      ipcRenderer.invoke('study:saveTermCards', cards),
+    getTermCards: (paperId: number) => ipcRenderer.invoke('study:getTermCards', paperId),
+    markTermReviewed: (id: number) => ipcRenderer.invoke('study:markTermReviewed', id)
   }
 }
 

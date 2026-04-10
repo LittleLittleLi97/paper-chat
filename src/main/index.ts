@@ -6,6 +6,7 @@ import { ChatStorage } from './services/chatStorage'
 import { AIService } from './services/aiService'
 import { PaperStorage } from './services/paperStorage'
 import { RAGService } from './services/ragService'
+import { StudyStorage } from './services/studyStorage'
 
 function createWindow(): void {
   // Create the browser window.
@@ -88,6 +89,33 @@ function setupIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('ai:comparePapers', async (_, payload) => {
+    try {
+      return await AIService.comparePapers(payload)
+    } catch (error) {
+      console.error('论文对比失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('ai:batchSummaries', async (_, payload) => {
+    try {
+      return await AIService.batchSummaries(payload)
+    } catch (error) {
+      console.error('批量摘要失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('ai:extractTermCards', async (_, payload) => {
+    try {
+      return await AIService.extractTermCards(payload)
+    } catch (error) {
+      console.error('术语卡片提取失败:', error)
+      throw error
+    }
+  })
+
   // 文件选择相关IPC
   ipcMain.handle('file:selectPDF', async () => {
     try {
@@ -166,6 +194,52 @@ function setupIpcHandlers(): void {
       await RAGService.addPaper(paperId, pdfPath)
     } catch (error) {
       console.error('论文向量化失败:', error)
+      throw error
+    }
+  })
+
+  // 学习资产（笔记/术语卡片）IPC
+  ipcMain.handle('study:saveNote', async (_, payload) => {
+    try {
+      return await StudyStorage.saveNote(payload)
+    } catch (error) {
+      console.error('保存笔记失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('study:getNotes', async (_, paperId: number) => {
+    try {
+      return await StudyStorage.getNotes(paperId)
+    } catch (error) {
+      console.error('获取笔记失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('study:saveTermCards', async (_, cards) => {
+    try {
+      return await StudyStorage.saveTermCards(cards)
+    } catch (error) {
+      console.error('保存术语卡片失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('study:getTermCards', async (_, paperId: number) => {
+    try {
+      return await StudyStorage.getTermCards(paperId)
+    } catch (error) {
+      console.error('获取术语卡片失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('study:markTermReviewed', async (_, id: number) => {
+    try {
+      return await StudyStorage.markTermReviewed(id)
+    } catch (error) {
+      console.error('更新术语复习状态失败:', error)
       throw error
     }
   })

@@ -19,6 +19,15 @@ declare global {
             quickAction?: string
           }
         }) => Promise<string>
+        comparePapers: (payload: {
+          papers: Array<{ id: number; title: string }>
+          focus?: string
+        }) => Promise<string>
+        batchSummaries: (payload: { papers: Array<{ id: number; title: string }> }) => Promise<string>
+        extractTermCards: (payload: {
+          paper: { id: number; title: string }
+          messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
+        }) => Promise<Array<{ term: string; definition: string }>>
       }
       file: {
         selectPDF: () => Promise<string[] | null>
@@ -32,6 +41,38 @@ declare global {
       }
       rag: {
         addPaper: (paperId: number, pdfPath: string) => Promise<void>
+      }
+      study: {
+        saveNote: (payload: {
+          paperId: number
+          content: string
+          sourceMessage?: string
+          timestamp: number
+        }) => Promise<number>
+        getNotes: (paperId: number) => Promise<
+          Array<{
+            id?: number
+            paperId: number
+            content: string
+            sourceMessage?: string
+            timestamp: number
+          }>
+        >
+        saveTermCards: (
+          cards: Array<{ paperId: number; term: string; definition: string; createdAt: number }>
+        ) => Promise<void>
+        getTermCards: (paperId: number) => Promise<
+          Array<{
+            id?: number
+            paperId: number
+            term: string
+            definition: string
+            reviewCount?: number
+            lastReviewedAt?: number | null
+            createdAt: number
+          }>
+        >
+        markTermReviewed: (id: number) => Promise<void>
       }
     }
   }
