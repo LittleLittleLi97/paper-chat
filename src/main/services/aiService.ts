@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import dotenv from 'dotenv'
 import { app } from 'electron'
-import { retrieveTool } from './tools'
+import { createRetrieveTool } from './tools'
 import { createAgent } from "langchain";
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import { ChatDeepSeek } from "@langchain/deepseek";
@@ -14,6 +14,19 @@ dotenv.config()
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
+}
+
+export interface ChatContext {
+  paperId?: number
+  paperTitle?: string
+  currentPage?: number | null
+  selectedText?: string
+  quickAction?: string
+}
+
+export interface ChatRequest {
+  messages: ChatMessage[]
+  context?: ChatContext
 }
 
 // 读取系统提示
@@ -34,10 +47,49 @@ const deepseek = new ChatDeepSeek({
   },
 })
 
-const agent = createAgent({
-  model: deepseek,
-  tools: [retrieveTool],
-})
+const responseTemplate = [
+  '请使用如下统一结构输出（无信息可得时要明确说明）：',
+  '【要点速览】3-5条',
+  '【正文解读】按用户问题展开',
+  '【阅读建议】1-3条可执行下一步'
+].join('\n')
+
+function buildSystemPrompt(context: ChatContext): string {
+  const scopedPaperPrompt =
+    context.paperId && context.paperId > 0
+      ? `当前会话必须优先基于 paperId=${context.paperId}（${context.paperTitle || '当前论文'}）检索并回答。`
+      : '当前会话是通用会话，可跨文献检索。'
+  const pagePrompt =
+    typeof context.currentPage === 'number' && context.currentPage > 0
+      ? `用户当前阅读页码：${context.currentPage}。`
+      : '未提供当前页码。'
+  const selectedTextPrompt =
+    context.selectedText?.trim()
+      ? `用户圈定文本如下，请优先解释该片段：\n${context.selectedText.trim()}`
+      : '未提供圈定文本。'
+  const quickActionPrompt = context.quickAction
+    ? `本次请求触发快捷动作：${context.quickAction}，回答应保持简洁并直接可用。`
+    : '本次请求未触发快捷动作。'
+
+  return `${systemPrompt}\n\n${responseTemplate}\n\n${scopedPaperPrompt}\n${pagePrompt}\n${quickActionPrompt}\n${selectedTextPrompt}`
+}
+
+function toTextContent(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === 'string') return part
+        if (part && typeof part === 'object' && 'text' in part) {
+          return String((part as { text: unknown }).text ?? '')
+        }
+        return ''
+      })
+      .join('\n')
+      .trim()
+  }
+  return String(content ?? '')
+}
 
 /**
  * AI 服务类（后端）
@@ -50,12 +102,21 @@ export class AIService {
    * @param messages 消息数组，包含用户和系统消息
    * @returns AI 回复内容
    */
-  static async chat(messages: ChatMessage[]): Promise<string> {
+  static async chat(request: ChatRequest | ChatMessage[]): Promise<string> {
     try {
+      const normalizedRequest: ChatRequest = Array.isArray(request)
+        ? { messages: request, context: {} }
+        : request
+      const runtimeContext = normalizedRequest.context ?? {}
+      const retrieveTool = createRetrieveTool({ paperId: runtimeContext.paperId })
+      const agent = createAgent({
+        model: deepseek,
+        tools: [retrieveTool],
+      })
 
       const messagesWithSystemPrompt: Array<ChatMessage> = [
-      // { role: 'system', content: systemPrompt }, // 暂时不添加系统提示
-      ...messages
+      { role: 'system', content: buildSystemPrompt(runtimeContext) },
+      ...normalizedRequest.messages
       ]
 
       // 转换为 LangChain 消息格式
@@ -77,7 +138,7 @@ export class AIService {
         messages: langchainMessages,
       })
 
-      const content = result.messages[result.messages.length - 1].content
+      const content = toTextContent(result.messages[result.messages.length - 1].content)
 
       if (!content) {
         throw new Error('AI 返回了空内容')

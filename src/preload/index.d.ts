@@ -9,9 +9,16 @@ declare global {
         deleteMessage: (id: number) => Promise<void>
       }
       ai: {
-        chat: (
+        chat: (payload: {
           messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
-        ) => Promise<string>
+          context?: {
+            paperId?: number
+            paperTitle?: string
+            currentPage?: number | null
+            selectedText?: string
+            quickAction?: string
+          }
+        }) => Promise<string>
       }
       file: {
         selectPDF: () => Promise<string[] | null>

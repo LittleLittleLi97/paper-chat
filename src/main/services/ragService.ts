@@ -1,7 +1,7 @@
-import { ChildProcess, spawn } from 'child_process'
+import { ChildProcess, execSync, spawn } from 'child_process'
 import { ChromaClient } from 'chromadb'
 import type { Collection } from 'chromadb'
-import { OpenAIEmbeddings } from '@langchain/openai'
+import { OllamaEmbeddings } from '@langchain/ollama'
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters'
 import { Document } from '@langchain/core/documents'
 import { PDFParse } from 'pdf-parse'
@@ -24,12 +24,9 @@ export class RAGService {
   private static readonly COLLECTION_NAME = 'papers'
   private static readonly CHROMA_PORT = 8100
 
-  private static readonly embeddings = new OpenAIEmbeddings({
-    configuration: {
-      baseURL: 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY
-    },
-    model: 'qwen/qwen3-embedding-8b'
+  private static readonly embeddings = new OllamaEmbeddings({
+    model: 'qwen3-embedding:4b',
+    baseUrl: process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434'
   })
 
   private static readonly splitter = new RecursiveCharacterTextSplitter({
@@ -63,7 +60,6 @@ export class RAGService {
 
     // 尝试从 python -c 获取 Scripts 目录
     try {
-      const { execSync } = require('child_process')
       const scriptsDir = execSync('python -c "import sysconfig; print(sysconfig.get_path(\'scripts\'))"', {
         encoding: 'utf-8',
         timeout: 5000
@@ -200,16 +196,26 @@ export class RAGService {
    * 全局相似度检索（跨所有论文）
    * 返回 LangChain Document 格式，兼容 tools.ts
    */
-  static async search(query: string, k: number = 4): Promise<Document[]> {
+  static async search(query: string, k: number = 4, options: { paperId?: number } = {}): Promise<Document[]> {
     if (!this.collection) return []
 
     try {
       const queryEmbedding = await this.embeddings.embedQuery(query)
 
-      const results = await this.collection.query({
+      const queryOptions: {
+        queryEmbeddings: number[][]
+        nResults: number
+        where?: { paperId: number }
+      } = {
         queryEmbeddings: [queryEmbedding],
         nResults: k
-      })
+      }
+
+      if (typeof options.paperId === 'number' && options.paperId > 0) {
+        queryOptions.where = { paperId: options.paperId }
+      }
+
+      const results = await this.collection.query(queryOptions)
 
       const documents: Document[] = []
       if (results.documents?.[0]) {

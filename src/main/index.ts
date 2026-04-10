@@ -79,9 +79,9 @@ function setupIpcHandlers(): void {
   })
 
   // AI服务相关IPC
-  ipcMain.handle('ai:chat', async (_, messages) => {
+  ipcMain.handle('ai:chat', async (_, payload) => {
     try {
-      return await AIService.chat(messages)
+      return await AIService.chat(payload)
     } catch (error) {
       console.error('AI聊天失败:', error)
       throw error

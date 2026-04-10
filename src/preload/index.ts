@@ -12,7 +12,16 @@ const api = {
   },
   // AI服务相关API
   ai: {
-    chat: (messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>) => ipcRenderer.invoke('ai:chat', messages)
+    chat: (payload: {
+      messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
+      context?: {
+        paperId?: number
+        paperTitle?: string
+        currentPage?: number | null
+        selectedText?: string
+        quickAction?: string
+      }
+    }) => ipcRenderer.invoke('ai:chat', payload)
   },
   // 文件选择相关API
   file: {

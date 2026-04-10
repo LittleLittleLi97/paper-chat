@@ -16,6 +16,7 @@
         <PaperList
           :papers="papers"
           :selected-paper="selectedPaper"
+          :index-status-map="indexStatusMap"
           @select-paper="selectPaper"
           @add-paper="addPaper"
         />
@@ -29,7 +30,11 @@
       ></div>
 
       <section class="panel panel-center">
-        <PaperReader :selected-paper="selectedPaper" />
+        <PaperReader
+          :selected-paper="selectedPaper"
+          :reading-context="readingContext"
+          @update-context="handleReaderContextUpdate"
+        />
       </section>
 
       <div
@@ -40,7 +45,7 @@
       ></div>
 
       <section class="panel panel-right">
-        <AIChat :selected-paper="selectedPaper" />
+        <AIChat :selected-paper="selectedPaper" :reading-context="readingContext" />
       </section>
     </main>
   </div>
@@ -56,6 +61,13 @@ interface Paper {
   id: number
   title: string
   path: string
+}
+
+type IndexStatus = 'idle' | 'indexing' | 'ready' | 'failed'
+
+interface ReadingContext {
+  currentPage: number | null
+  selectedText: string
 }
 
 type ResizeSide = 'left' | 'right'
@@ -74,6 +86,11 @@ const MIN_CENTER_WIDTH = 480
 
 const selectedPaper = ref<Paper | null>(null)
 const papers = ref<Paper[]>([])
+const indexStatusMap = ref<Record<number, IndexStatus>>({})
+const readingContext = ref<ReadingContext>({
+  currentPage: null,
+  selectedText: ''
+})
 const leftWidth = ref(DEFAULT_LEFT_WIDTH)
 const rightWidth = ref(DEFAULT_RIGHT_WIDTH)
 const isResizing = ref(false)
@@ -85,9 +102,9 @@ let activeSplitterEl: HTMLElement | null = null
 let draftLeftWidth = DEFAULT_LEFT_WIDTH
 let draftRightWidth = DEFAULT_RIGHT_WIDTH
 
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
+const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max)
 
-const persistLayout = () => {
+const persistLayout = (): void => {
   const payload: LayoutState = {
     leftWidth: leftWidth.value,
     rightWidth: rightWidth.value
@@ -95,7 +112,7 @@ const persistLayout = () => {
   localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(payload))
 }
 
-const applyWorkbenchWidths = (left: number, right: number) => {
+const applyWorkbenchWidths = (left: number, right: number): void => {
   if (!workbenchRef.value) return
   workbenchRef.value.style.setProperty('--left-width', `${left}px`)
   workbenchRef.value.style.setProperty('--right-width', `${right}px`)
@@ -120,7 +137,7 @@ const normalizeByViewport = (left: number, right: number): LayoutState => {
   }
 }
 
-const applyStoredLayout = () => {
+const applyStoredLayout = (): void => {
   const raw = localStorage.getItem(LAYOUT_STORAGE_KEY)
   if (!raw) return
 
@@ -138,8 +155,23 @@ const applyStoredLayout = () => {
   }
 }
 
-const selectPaper = (paper: Paper) => {
+const selectPaper = (paper: Paper): void => {
   selectedPaper.value = paper
+  readingContext.value = {
+    currentPage: null,
+    selectedText: ''
+  }
+}
+
+const handleReaderContextUpdate = (payload: ReadingContext): void => {
+  readingContext.value = payload
+}
+
+const setPaperIndexStatus = (paperId: number, status: IndexStatus): void => {
+  indexStatusMap.value = {
+    ...indexStatusMap.value,
+    [paperId]: status
+  }
 }
 
 const addPaper = async (): Promise<void> => {
@@ -151,9 +183,16 @@ const addPaper = async (): Promise<void> => {
       const title = path.split('\\').pop() || path
       const newPaper: Omit<Paper, 'id'> = { title, path }
       const id = await window.api.paper.savePaper(newPaper)
-      window.api.rag.addPaper(id, path).catch((err) => {
-        console.error(`论文向量化失败 (id=${id}):`, err)
-      })
+      setPaperIndexStatus(id, 'indexing')
+      window.api.rag
+        .addPaper(id, path)
+        .then(() => {
+          setPaperIndexStatus(id, 'ready')
+        })
+        .catch((err) => {
+          console.error(`论文向量化失败 (id=${id}):`, err)
+          setPaperIndexStatus(id, 'failed')
+        })
 
       const paperWithId: Paper = { ...newPaper, id }
       papers.value.push(paperWithId)
@@ -170,6 +209,11 @@ const initPapers = async (): Promise<void> => {
   try {
     const loadedPapers = await window.api.paper.getAllPapers()
     papers.value = loadedPapers || []
+    const statusSeed: Record<number, IndexStatus> = {}
+    for (const paper of papers.value) {
+      statusSeed[paper.id] = 'idle'
+    }
+    indexStatusMap.value = statusSeed
     if (!selectedPaper.value && papers.value.length > 0) {
       selectedPaper.value = papers.value[0]
     }
@@ -178,7 +222,7 @@ const initPapers = async (): Promise<void> => {
   }
 }
 
-const stopResize = () => {
+const stopResize = (): void => {
   if (!activeResize) return
 
   const committed = normalizeByViewport(draftLeftWidth, draftRightWidth)
@@ -198,7 +242,7 @@ const stopResize = () => {
   persistLayout()
 }
 
-const applyResizeAt = (clientX: number) => {
+const applyResizeAt = (clientX: number): void => {
   const viewportWidth = window.innerWidth
   if (activeResize === 'left') {
     const maxLeft = Math.max(
@@ -221,13 +265,13 @@ const applyResizeAt = (clientX: number) => {
   applyWorkbenchWidths(draftLeftWidth, draftRightWidth)
 }
 
-const handleResizeMove = (event: PointerEvent) => {
+const handleResizeMove = (event: PointerEvent): void => {
   if (!activeResize) return
   if (activePointerId !== null && event.pointerId !== activePointerId) return
   applyResizeAt(event.clientX)
 }
 
-const startResize = (side: ResizeSide, event: PointerEvent) => {
+const startResize = (side: ResizeSide, event: PointerEvent): void => {
   event.preventDefault()
   activeResize = side
   isResizing.value = true
@@ -241,7 +285,7 @@ const startResize = (side: ResizeSide, event: PointerEvent) => {
   applyResizeAt(event.clientX)
 }
 
-onMounted(async () => {
+onMounted(async (): Promise<void> => {
   applyStoredLayout()
   applyWorkbenchWidths(leftWidth.value, rightWidth.value)
   await initPapers()
@@ -251,7 +295,7 @@ onMounted(async () => {
   window.addEventListener('blur', stopResize)
 })
 
-onBeforeUnmount(() => {
+onBeforeUnmount((): void => {
   window.removeEventListener('pointermove', handleResizeMove)
   window.removeEventListener('pointerup', stopResize)
   window.removeEventListener('pointercancel', stopResize)

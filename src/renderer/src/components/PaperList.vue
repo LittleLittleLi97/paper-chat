@@ -16,7 +16,12 @@
         :title="paper.path"
         @click="selectPaper(paper)"
       >
-        <div class="paper-title">{{ paper.title }}</div>
+        <div class="paper-headline">
+          <div class="paper-title">{{ paper.title }}</div>
+          <span :class="['index-badge', `status-${indexStatusMap[paper.id] || 'idle'}`]">
+            {{ statusLabelMap[indexStatusMap[paper.id] || 'idle'] }}
+          </span>
+        </div>
         <div class="paper-path">{{ paper.path }}</div>
       </li>
     </ul>
@@ -38,9 +43,17 @@ interface Paper {
 interface Props {
   papers: Paper[]
   selectedPaper: Paper | null
+  indexStatusMap: Record<number, 'idle' | 'indexing' | 'ready' | 'failed'>
 }
 
 defineProps<Props>()
+
+const statusLabelMap = {
+  idle: '待索引',
+  indexing: '索引中',
+  ready: '可问答',
+  failed: '索引失败'
+} as const
 
 const emit = defineEmits<{
   selectPaper: [paper: Paper]
@@ -151,9 +164,44 @@ const addPaper = (): void => {
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
+  min-width: 0;
+  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.paper-headline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.index-badge {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  border: 1px solid var(--border-subtle);
+}
+
+.index-badge.status-idle {
+  color: var(--text-muted);
+}
+
+.index-badge.status-indexing {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.index-badge.status-ready {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 55%, transparent);
+}
+
+.index-badge.status-failed {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
 }
 
 .paper-path {

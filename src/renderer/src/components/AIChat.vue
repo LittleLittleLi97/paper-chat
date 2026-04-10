@@ -95,13 +95,25 @@
     </div>
 
     <div class="input-container">
+      <div class="quick-actions">
+        <button
+          v-for="action in quickActions"
+          :key="action.id"
+          class="quick-action-btn"
+          :disabled="isLoading"
+          @click="runQuickAction(action.id)"
+        >
+          {{ action.label }}
+        </button>
+      </div>
+      <div v-if="contextSummary" class="context-summary">{{ contextSummary }}</div>
       <div class="input-wrapper">
         <textarea
           v-model="inputText"
           class="message-input"
           placeholder="输入消息..."
           rows="1"
-          @keydown.enter.exact.prevent="handleSend"
+          @keydown.enter.exact.prevent="handleSendKeydown"
           @keydown.enter.shift.exact="handleNewLine"
           @input="handleInput"
           ref="inputRef"
@@ -109,7 +121,7 @@
         <button
           class="send-button"
           :disabled="!canSend || isLoading"
-          @click="handleSend"
+          @click="handleSendClick"
           title="发送 (Enter)"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -149,6 +161,10 @@ interface Paper {
 
 interface Props {
   selectedPaper: Paper | null
+  readingContext: {
+    currentPage: number | null
+    selectedText: string
+  }
 }
 
 const props = defineProps<Props>()
@@ -160,21 +176,41 @@ const inputRef = ref<HTMLTextAreaElement | null>(null)
 const isLoading = ref(false)
 const errorMessage = ref('')
 
-const canSend = computed(() => {
+const quickActions = [
+  { id: 'quick-read', label: '3分钟速读', prompt: '请对当前论文做3分钟速读，包含研究问题、方法、核心贡献。' },
+  { id: 'section-summary', label: '章节摘要', prompt: '请按论文结构输出章节摘要，优先给出每章一句话要点。' },
+  { id: 'term-explain', label: '术语解释', prompt: '请解释当前论文中的关键术语，给出通俗定义和论文语境下含义。' },
+  { id: 'key-findings', label: '关键结论提取', prompt: '请提取当前论文关键结论，并标注适合写入笔记的要点。' }
+] as const
+
+const pendingQuickAction = ref<string | undefined>(undefined)
+
+const canSend = computed((): boolean => {
   return inputText.value.trim().length > 0 && !isLoading.value
 })
 
-const handleInput = (event: Event) => {
+const contextSummary = computed((): string => {
+  const details: string[] = []
+  if (typeof props.readingContext.currentPage === 'number' && props.readingContext.currentPage > 0) {
+    details.push(`页码 ${props.readingContext.currentPage}`)
+  }
+  if (props.readingContext.selectedText.trim()) {
+    details.push(`已附带选中文本 ${props.readingContext.selectedText.trim().length} 字`)
+  }
+  return details.length ? `阅读上下文：${details.join('，')}` : ''
+})
+
+const handleInput = (event: Event): void => {
   const target = event.target as HTMLTextAreaElement
   target.style.height = 'auto'
   target.style.height = `${Math.min(target.scrollHeight, 200)}px`
 }
 
-const handleNewLine = () => {
+const handleNewLine = (): void => {
   // Shift + Enter 时插入换行，不做额外处理
 }
 
-const handleSend = async () => {
+const handleSend = async (quickActionId?: string): Promise<void> => {
   if (!canSend.value) return
 
   const userContent = inputText.value.trim()
@@ -209,12 +245,22 @@ const handleSend = async () => {
   scrollToBottom()
 
   isLoading.value = true
+  pendingQuickAction.value = quickActionId
   try {
     const chatHistory = messages.value.map((msg) => ({
       role: msg.role,
       content: msg.content
     }))
-    const aiResponse = await window.api.ai.chat(chatHistory)
+    const aiResponse = await window.api.ai.chat({
+      messages: chatHistory,
+      context: {
+        paperId: props.selectedPaper?.id,
+        paperTitle: props.selectedPaper?.title,
+        currentPage: props.readingContext.currentPage,
+        selectedText: props.readingContext.selectedText,
+        quickAction: pendingQuickAction.value
+      }
+    })
 
     const aiMessage: Omit<ChatMessage, 'id'> = {
       role: 'assistant',
@@ -234,10 +280,27 @@ const handleSend = async () => {
     errorMessage.value = error instanceof Error ? error.message : 'AI 服务调用失败，请稍后重试'
   } finally {
     isLoading.value = false
+    pendingQuickAction.value = undefined
   }
 }
 
-const scrollToBottom = () => {
+const runQuickAction = (actionId: (typeof quickActions)[number]['id']): void => {
+  if (isLoading.value) return
+  const action = quickActions.find((item) => item.id === actionId)
+  if (!action) return
+  inputText.value = action.prompt
+  void handleSend(action.id)
+}
+
+const handleSendClick = (): void => {
+  void handleSend()
+}
+
+const handleSendKeydown = (): void => {
+  void handleSend()
+}
+
+const scrollToBottom = (): void => {
   nextTick(() => {
     if (messagesContainerRef.value) {
       messagesContainerRef.value.scrollTop = messagesContainerRef.value.scrollHeight
@@ -245,7 +308,7 @@ const scrollToBottom = () => {
   })
 }
 
-const loadHistory = async (paperId: number = 0) => {
+const loadHistory = async (paperId: number = 0): Promise<void> => {
   try {
     const historyMessages = await window.api.chat.getAllMessages(paperId)
     messages.value = historyMessages
@@ -419,6 +482,39 @@ onMounted(() => {
 .input-container {
   padding: var(--space-4);
   border-top: 1px solid var(--border-subtle);
+}
+
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.quick-action-btn {
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-panel) 84%, transparent);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  font-size: 11px;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+
+.quick-action-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text-primary);
+}
+
+.quick-action-btn:disabled {
+  cursor: not-allowed;
+  color: var(--text-muted);
+}
+
+.context-summary {
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .input-wrapper {
