@@ -64,6 +64,9 @@ import ChatInputPanel from './chat/ChatInputPanel.vue'
 import ChatMessageList from './chat/ChatMessageList.vue'
 import StudyAssetsPanel from './chat/StudyAssetsPanel.vue'
 import type { ChatMessage, Paper, QuickAction, StudyNote, TermCard } from './chat/types'
+import { usePanelState } from './chat/composables/usePanelState'
+import { useResearchTools } from './chat/composables/useResearchTools'
+import { useTermCarousel } from './chat/composables/useTermCarousel'
 
 interface Props {
   selectedPaper: Paper | null
@@ -72,14 +75,6 @@ interface Props {
     currentPage: number | null
     selectedText: string
   }
-}
-
-type SectionKey = 'tools' | 'notes' | 'terms'
-
-interface PanelState {
-  tools: boolean
-  notes: boolean
-  terms: boolean
 }
 
 type MessageListExpose = {
@@ -96,11 +91,26 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 const notes = ref<StudyNote[]>([])
 const termCards = ref<TermCard[]>([])
-const comparePaperIds = ref<number[]>([])
-const isResearchToolsOpen = ref(false)
-const isNotesOpen = ref(false)
-const isTermsOpen = ref(false)
-const termCardCursor = ref(0)
+const {
+  comparePaperIds,
+  selectedPaperCount,
+  canRunCompare,
+  canRunBatch,
+  researchToolHint,
+  toggleComparePaper,
+  ensurePaperSelected
+} = useResearchTools()
+const { isResearchToolsOpen, isNotesOpen, isTermsOpen, restorePanelState, toggleSection } =
+  usePanelState(PANEL_STATE_KEY)
+const {
+  termCardCursor,
+  currentTermCard,
+  hasPrevCard,
+  hasNextCard,
+  goPrevTermCard,
+  goNextTermCard,
+  resetTermCardCursor
+} = useTermCarousel(termCards)
 
 const quickActions = [
   {
@@ -128,21 +138,6 @@ const quickActions = [
 const pendingQuickAction = ref<string | undefined>(undefined)
 
 const canSend = computed((): boolean => inputText.value.trim().length > 0 && !isLoading.value)
-const selectedPaperCount = computed((): number => comparePaperIds.value.length)
-const canRunCompare = computed((): boolean => comparePaperIds.value.length >= 2)
-const canRunBatch = computed((): boolean => comparePaperIds.value.length > 0)
-const researchToolHint = computed((): string => {
-  if (comparePaperIds.value.length === 0) return '至少勾选 1 篇论文可执行批量摘要'
-  if (comparePaperIds.value.length === 1) return '再勾选 1 篇可执行多论文对比'
-  return '已满足对比与批量摘要条件'
-})
-const currentTermCard = computed((): TermCard | null => {
-  if (termCards.value.length === 0) return null
-  const safeCursor = Math.min(Math.max(termCardCursor.value, 0), termCards.value.length - 1)
-  return termCards.value[safeCursor] ?? null
-})
-const hasPrevCard = computed((): boolean => termCardCursor.value > 0)
-const hasNextCard = computed((): boolean => termCardCursor.value < termCards.value.length - 1)
 const contextSummary = computed((): string => {
   const details: string[] = []
   if (
@@ -156,47 +151,6 @@ const contextSummary = computed((): string => {
   }
   return details.length ? `阅读上下文：${details.join('，')}` : ''
 })
-
-const persistPanelState = (): void => {
-  const state: PanelState = {
-    tools: isResearchToolsOpen.value,
-    notes: isNotesOpen.value,
-    terms: isTermsOpen.value
-  }
-  localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(state))
-}
-
-const restorePanelState = (): void => {
-  const raw = localStorage.getItem(PANEL_STATE_KEY)
-  if (!raw) return
-  try {
-    const parsed = JSON.parse(raw) as Partial<PanelState>
-    isResearchToolsOpen.value = Boolean(parsed.tools)
-    isNotesOpen.value = Boolean(parsed.notes)
-    isTermsOpen.value = Boolean(parsed.terms)
-  } catch {
-    isResearchToolsOpen.value = false
-    isNotesOpen.value = false
-    isTermsOpen.value = false
-  }
-}
-
-const toggleSection = (sectionKey: SectionKey): void => {
-  if (sectionKey === 'tools') isResearchToolsOpen.value = !isResearchToolsOpen.value
-  else if (sectionKey === 'notes') isNotesOpen.value = !isNotesOpen.value
-  else isTermsOpen.value = !isTermsOpen.value
-  persistPanelState()
-}
-
-const goPrevTermCard = (): void => {
-  if (!hasPrevCard.value) return
-  termCardCursor.value -= 1
-}
-
-const goNextTermCard = (): void => {
-  if (!hasNextCard.value) return
-  termCardCursor.value += 1
-}
 
 const scrollToBottom = (): void => {
   nextTick(() => {
@@ -270,14 +224,6 @@ const runQuickAction = (actionId: string): void => {
   if (!action) return
   inputText.value = action.prompt
   void handleSend(action.id)
-}
-
-const toggleComparePaper = (paperId: number): void => {
-  if (comparePaperIds.value.includes(paperId)) {
-    comparePaperIds.value = comparePaperIds.value.filter((id) => id !== paperId)
-    return
-  }
-  comparePaperIds.value = [...comparePaperIds.value, paperId]
 }
 
 const runComparePapers = async (): Promise<void> => {
@@ -391,7 +337,7 @@ const loadStudyAssets = async (paperId: number): Promise<void> => {
   if (!paperId) {
     notes.value = []
     termCards.value = []
-    termCardCursor.value = 0
+    resetTermCardCursor()
     return
   }
   const [loadedNotes, loadedCards] = await Promise.all([
@@ -400,7 +346,7 @@ const loadStudyAssets = async (paperId: number): Promise<void> => {
   ])
   notes.value = loadedNotes
   termCards.value = loadedCards
-  termCardCursor.value = 0
+  resetTermCardCursor()
 }
 
 watch(
@@ -409,31 +355,16 @@ watch(
     if (newPaper) {
       loadHistory(newPaper.id)
       loadStudyAssets(newPaper.id)
-      termCardCursor.value = 0
-      if (!comparePaperIds.value.includes(newPaper.id)) {
-        comparePaperIds.value = [...comparePaperIds.value, newPaper.id]
-      }
+      resetTermCardCursor()
+      ensurePaperSelected(newPaper.id)
     } else {
       loadHistory(0)
       notes.value = []
       termCards.value = []
-      termCardCursor.value = 0
+      resetTermCardCursor()
     }
   },
   { immediate: true }
-)
-
-watch(
-  () => termCards.value.length,
-  (length) => {
-    if (length === 0) {
-      termCardCursor.value = 0
-      return
-    }
-    if (termCardCursor.value >= length) {
-      termCardCursor.value = length - 1
-    }
-  }
 )
 
 onMounted(() => {
