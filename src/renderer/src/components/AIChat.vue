@@ -5,7 +5,7 @@
       <span class="chat-context">{{ selectedPaper ? selectedPaper.title : '通用会话' }}</span>
     </div>
 
-    <div class="messages-container" ref="messagesContainerRef">
+    <div ref="messagesContainerRef" class="messages-container">
       <div class="messages-list">
         <div
           v-for="message in messages"
@@ -76,7 +76,7 @@
             />
           </svg>
           <span>{{ errorMessage }}</span>
-          <button @click="errorMessage = ''" class="error-close">×</button>
+          <button class="error-close" @click="errorMessage = ''">×</button>
         </div>
 
         <div v-if="messages.length === 0 && !isLoading" class="empty-state">
@@ -97,49 +97,89 @@
       </div>
     </div>
 
-    <div v-if="selectedPaper" class="study-panel">
-      <div class="study-column">
-        <div class="study-title">阅读笔记</div>
-        <div v-if="notes.length === 0" class="study-empty">暂无笔记</div>
-        <div v-for="note in notes" :key="note.id" class="study-item">
-          <div class="study-item-content">{{ note.content }}</div>
-          <div class="study-item-meta">{{ formatTime(note.timestamp) }}</div>
-        </div>
-      </div>
-      <div class="study-column">
-        <div class="study-title-row">
-          <div class="study-title">术语卡片</div>
-          <button class="mini-action-btn" :disabled="isLoading" @click="generateTermCards">从会话生成</button>
-        </div>
-        <div v-if="termCards.length === 0" class="study-empty">暂无术语卡片</div>
-        <div v-for="card in termCards" :key="card.id" class="study-item">
-          <div class="study-item-content"><strong>{{ card.term }}</strong>：{{ card.definition }}</div>
-          <button class="review-btn" @click="markReviewed(card)">已复习 {{ card.reviewCount || 0 }}</button>
-        </div>
-      </div>
-    </div>
-
     <div class="input-container">
-      <div v-if="papers.length > 1" class="p1-toolbox">
-        <div class="p1-title">P1 工具</div>
-        <div class="compare-paper-list">
-          <label v-for="paper in papers" :key="paper.id" class="paper-check-item">
-            <input
-              type="checkbox"
-              :value="paper.id"
-              :checked="comparePaperIds.includes(paper.id)"
-              @change="toggleComparePaper(paper.id)"
-            />
-            <span>{{ paper.title }}</span>
-          </label>
+      <div v-if="selectedPaper" class="collapsible-panel">
+        <button class="section-toggle" @click="toggleSection('notes')">
+          <span>阅读笔记</span>
+          <span class="badge">{{ notesCount }}</span>
+        </button>
+        <div v-if="isNotesOpen" class="section-body notes-scroll">
+          <div v-if="notes.length === 0" class="study-empty">暂无笔记</div>
+          <div v-for="note in notes" :key="note.id" class="study-item">
+            <div class="study-item-content">{{ note.content }}</div>
+            <div class="study-item-meta">{{ formatTime(note.timestamp) }}</div>
+          </div>
         </div>
-        <div class="p1-actions">
-          <button class="quick-action-btn" :disabled="isLoading" @click="runComparePapers">
-            多论文快速对比
-          </button>
-          <button class="quick-action-btn" :disabled="isLoading" @click="runBatchSummaries">
-            批量摘要卡片
-          </button>
+      </div>
+
+      <div v-if="selectedPaper" class="collapsible-panel">
+        <button class="section-toggle" @click="toggleSection('terms')">
+          <span>术语卡片</span>
+          <span class="badge">{{ termCardsCount }}</span>
+        </button>
+        <div v-if="isTermsOpen" class="section-body">
+          <div class="study-title-row">
+            <div class="study-empty">单卡浏览</div>
+            <button class="mini-action-btn" :disabled="isLoading" @click="generateTermCards">
+              从会话生成
+            </button>
+          </div>
+          <div v-if="!currentTermCard" class="study-empty">暂无术语卡片</div>
+          <div v-else class="study-item">
+            <div class="study-item-content">
+              <strong>{{ currentTermCard.term }}</strong
+              >：{{ currentTermCard.definition }}
+            </div>
+            <div class="carousel-controls">
+              <button class="review-btn" :disabled="!hasPrevCard" @click="goPrevTermCard">
+                上一张
+              </button>
+              <span class="study-item-meta">{{ termCardCursor + 1 }} / {{ termCardsCount }}</span>
+              <button class="review-btn" :disabled="!hasNextCard" @click="goNextTermCard">
+                下一张
+              </button>
+              <button class="review-btn" @click="markReviewed(currentTermCard)">
+                已复习 {{ currentTermCard.reviewCount || 0 }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="papers.length > 1" class="collapsible-panel">
+        <button class="section-toggle" @click="toggleSection('tools')">
+          <span>研究工具</span>
+          <span class="badge">{{ selectedPaperCount }}</span>
+        </button>
+        <div v-if="isResearchToolsOpen" class="section-body">
+          <div class="compare-paper-list">
+            <label v-for="paper in papers" :key="paper.id" class="paper-check-item">
+              <input
+                type="checkbox"
+                :value="paper.id"
+                :checked="comparePaperIds.includes(paper.id)"
+                @change="toggleComparePaper(paper.id)"
+              />
+              <span>{{ paper.title }}</span>
+            </label>
+          </div>
+          <div class="p1-actions">
+            <button
+              class="quick-action-btn"
+              :disabled="isLoading || !canRunCompare"
+              @click="runComparePapers"
+            >
+              多论文快速对比
+            </button>
+            <button
+              class="quick-action-btn"
+              :disabled="isLoading || !canRunBatch"
+              @click="runBatchSummaries"
+            >
+              批量摘要卡片
+            </button>
+          </div>
+          <div class="tool-hint">{{ researchToolHint }}</div>
         </div>
       </div>
       <div class="quick-actions">
@@ -156,6 +196,7 @@
       <div v-if="contextSummary" class="context-summary">{{ contextSummary }}</div>
       <div class="input-wrapper">
         <textarea
+          ref="inputRef"
           v-model="inputText"
           class="message-input"
           placeholder="输入消息..."
@@ -163,13 +204,12 @@
           @keydown.enter.exact.prevent="handleSendKeydown"
           @keydown.enter.shift.exact="handleNewLine"
           @input="handleInput"
-          ref="inputRef"
         ></textarea>
         <button
           class="send-button"
           :disabled="!canSend || isLoading"
-          @click="handleSendClick"
           title="发送 (Enter)"
+          @click="handleSendClick"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <path
@@ -235,6 +275,16 @@ interface TermCard {
   createdAt: number
 }
 
+type SectionKey = 'tools' | 'notes' | 'terms'
+
+interface PanelState {
+  tools: boolean
+  notes: boolean
+  terms: boolean
+}
+
+const PANEL_STATE_KEY = 'paper-assistant-p1-panels-v1'
+
 const messages = ref<ChatMessage[]>([])
 const inputText = ref('')
 const messagesContainerRef = ref<HTMLDivElement | null>(null)
@@ -244,12 +294,32 @@ const errorMessage = ref('')
 const notes = ref<StudyNote[]>([])
 const termCards = ref<TermCard[]>([])
 const comparePaperIds = ref<number[]>([])
+const isResearchToolsOpen = ref(false)
+const isNotesOpen = ref(false)
+const isTermsOpen = ref(false)
+const termCardCursor = ref(0)
 
 const quickActions = [
-  { id: 'quick-read', label: '3分钟速读', prompt: '请对当前论文做3分钟速读，包含研究问题、方法、核心贡献。' },
-  { id: 'section-summary', label: '章节摘要', prompt: '请按论文结构输出章节摘要，优先给出每章一句话要点。' },
-  { id: 'term-explain', label: '术语解释', prompt: '请解释当前论文中的关键术语，给出通俗定义和论文语境下含义。' },
-  { id: 'key-findings', label: '关键结论提取', prompt: '请提取当前论文关键结论，并标注适合写入笔记的要点。' }
+  {
+    id: 'quick-read',
+    label: '3分钟速读',
+    prompt: '请对当前论文做3分钟速读，包含研究问题、方法、核心贡献。'
+  },
+  {
+    id: 'section-summary',
+    label: '章节摘要',
+    prompt: '请按论文结构输出章节摘要，优先给出每章一句话要点。'
+  },
+  {
+    id: 'term-explain',
+    label: '术语解释',
+    prompt: '请解释当前论文中的关键术语，给出通俗定义和论文语境下含义。'
+  },
+  {
+    id: 'key-findings',
+    label: '关键结论提取',
+    prompt: '请提取当前论文关键结论，并标注适合写入笔记的要点。'
+  }
 ] as const
 
 const pendingQuickAction = ref<string | undefined>(undefined)
@@ -258,9 +328,30 @@ const canSend = computed((): boolean => {
   return inputText.value.trim().length > 0 && !isLoading.value
 })
 
+const notesCount = computed((): number => notes.value.length)
+const termCardsCount = computed((): number => termCards.value.length)
+const selectedPaperCount = computed((): number => comparePaperIds.value.length)
+const canRunCompare = computed((): boolean => comparePaperIds.value.length >= 2)
+const canRunBatch = computed((): boolean => comparePaperIds.value.length > 0)
+const researchToolHint = computed((): string => {
+  if (comparePaperIds.value.length === 0) return '至少勾选 1 篇论文可执行批量摘要'
+  if (comparePaperIds.value.length === 1) return '再勾选 1 篇可执行多论文对比'
+  return '已满足对比与批量摘要条件'
+})
+const currentTermCard = computed((): TermCard | null => {
+  if (termCards.value.length === 0) return null
+  const safeCursor = Math.min(Math.max(termCardCursor.value, 0), termCards.value.length - 1)
+  return termCards.value[safeCursor] ?? null
+})
+const hasPrevCard = computed((): boolean => termCardCursor.value > 0)
+const hasNextCard = computed((): boolean => termCardCursor.value < termCards.value.length - 1)
+
 const contextSummary = computed((): string => {
   const details: string[] = []
-  if (typeof props.readingContext.currentPage === 'number' && props.readingContext.currentPage > 0) {
+  if (
+    typeof props.readingContext.currentPage === 'number' &&
+    props.readingContext.currentPage > 0
+  ) {
     details.push(`页码 ${props.readingContext.currentPage}`)
   }
   if (props.readingContext.selectedText.trim()) {
@@ -271,6 +362,51 @@ const contextSummary = computed((): string => {
 
 const formatTime = (timestamp: number): string => {
   return new Date(timestamp).toLocaleString()
+}
+
+const persistPanelState = (): void => {
+  const state: PanelState = {
+    tools: isResearchToolsOpen.value,
+    notes: isNotesOpen.value,
+    terms: isTermsOpen.value
+  }
+  localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(state))
+}
+
+const restorePanelState = (): void => {
+  const raw = localStorage.getItem(PANEL_STATE_KEY)
+  if (!raw) return
+  try {
+    const parsed = JSON.parse(raw) as Partial<PanelState>
+    isResearchToolsOpen.value = Boolean(parsed.tools)
+    isNotesOpen.value = Boolean(parsed.notes)
+    isTermsOpen.value = Boolean(parsed.terms)
+  } catch {
+    isResearchToolsOpen.value = false
+    isNotesOpen.value = false
+    isTermsOpen.value = false
+  }
+}
+
+const toggleSection = (sectionKey: SectionKey): void => {
+  if (sectionKey === 'tools') {
+    isResearchToolsOpen.value = !isResearchToolsOpen.value
+  } else if (sectionKey === 'notes') {
+    isNotesOpen.value = !isNotesOpen.value
+  } else {
+    isTermsOpen.value = !isTermsOpen.value
+  }
+  persistPanelState()
+}
+
+const goPrevTermCard = (): void => {
+  if (!hasPrevCard.value) return
+  termCardCursor.value -= 1
+}
+
+const goNextTermCard = (): void => {
+  if (!hasNextCard.value) return
+  termCardCursor.value += 1
 }
 
 const handleInput = (event: Event): void => {
@@ -369,10 +505,7 @@ const toggleComparePaper = (paperId: number): void => {
 }
 
 const runComparePapers = async (): Promise<void> => {
-  if (comparePaperIds.value.length < 2) {
-    errorMessage.value = '请至少勾选 2 篇论文进行对比'
-    return
-  }
+  if (!canRunCompare.value) return
   isLoading.value = true
   errorMessage.value = ''
   try {
@@ -399,10 +532,7 @@ const runComparePapers = async (): Promise<void> => {
 }
 
 const runBatchSummaries = async (): Promise<void> => {
-  if (comparePaperIds.value.length === 0) {
-    errorMessage.value = '请先勾选需要批量摘要的论文'
-    return
-  }
+  if (!canRunBatch.value) return
   isLoading.value = true
   errorMessage.value = ''
   try {
@@ -512,6 +642,7 @@ const loadStudyAssets = async (paperId: number): Promise<void> => {
   if (!paperId) {
     notes.value = []
     termCards.value = []
+    termCardCursor.value = 0
     return
   }
   const [loadedNotes, loadedCards] = await Promise.all([
@@ -520,6 +651,7 @@ const loadStudyAssets = async (paperId: number): Promise<void> => {
   ])
   notes.value = loadedNotes
   termCards.value = loadedCards
+  termCardCursor.value = 0
 }
 
 watch(
@@ -528,6 +660,7 @@ watch(
     if (newPaper) {
       loadHistory(newPaper.id)
       loadStudyAssets(newPaper.id)
+      termCardCursor.value = 0
       if (!comparePaperIds.value.includes(newPaper.id)) {
         comparePaperIds.value = [...comparePaperIds.value, newPaper.id]
       }
@@ -535,12 +668,27 @@ watch(
       loadHistory(0)
       notes.value = []
       termCards.value = []
+      termCardCursor.value = 0
     }
   },
   { immediate: true }
 )
 
+watch(
+  () => termCards.value.length,
+  (length) => {
+    if (length === 0) {
+      termCardCursor.value = 0
+      return
+    }
+    if (termCardCursor.value >= length) {
+      termCardCursor.value = length - 1
+    }
+  }
+)
+
 onMounted(() => {
+  restorePanelState()
   loadHistory(props.selectedPaper?.id || 0)
   if (props.selectedPaper?.id) {
     loadStudyAssets(props.selectedPaper.id)
@@ -712,23 +860,45 @@ onMounted(() => {
   border-top: 1px solid var(--border-subtle);
 }
 
-.study-panel {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--border-subtle);
-}
-
-.study-column {
-  min-height: 0;
-}
-
-.study-title {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 600;
+.collapsible-panel {
   margin-bottom: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-panel-soft) 72%, transparent);
+}
+
+.section-toggle {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.section-body {
+  border-top: 1px solid var(--border-subtle);
+  padding: 8px;
+}
+
+.badge {
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--text-muted);
+  min-width: 20px;
+  text-align: center;
+  padding: 1px 6px;
+}
+
+.notes-scroll {
+  max-height: 160px;
+  overflow-y: auto;
 }
 
 .study-title-row {
@@ -775,21 +945,6 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.p1-toolbox {
-  margin-bottom: 10px;
-  padding: 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--bg-panel-soft) 72%, transparent);
-}
-
-.p1-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-}
-
 .compare-paper-list {
   display: flex;
   flex-direction: column;
@@ -810,6 +965,20 @@ onMounted(() => {
 .p1-actions {
   display: flex;
   gap: var(--space-2);
+}
+
+.tool-hint {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.carousel-controls {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .quick-actions {
