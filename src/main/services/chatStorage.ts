@@ -1,5 +1,7 @@
 import sqlite3 from 'sqlite3'
 import { open, Database } from 'sqlite'
+import fs from 'fs'
+import path from 'path'
 
 // 消息数据结构
 export interface ChatMessage {
@@ -16,6 +18,8 @@ export interface ChatMessage {
  */
 export class ChatStorage {
   private static db: Database | null = null
+  private static readonly DB_DIR = path.resolve(process.cwd(), 'db')
+  private static readonly DB_PATH = path.join(ChatStorage.DB_DIR, 'chat.db')
 
   /**
    * 初始化数据库
@@ -26,8 +30,11 @@ export class ChatStorage {
     }
 
     // 打开数据库连接
+    if (!fs.existsSync(this.DB_DIR)) {
+      fs.mkdirSync(this.DB_DIR, { recursive: true })
+    }
     this.db = await open({
-      filename: './chat.db',
+      filename: this.DB_PATH,
       driver: sqlite3.Database
     })
 

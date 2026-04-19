@@ -1,5 +1,7 @@
 import sqlite3 from 'sqlite3'
 import { open, Database } from 'sqlite'
+import fs from 'fs'
+import path from 'path'
 
 /**
  * PDF文件数据结构
@@ -19,6 +21,8 @@ export type IndexStatus = 'idle' | 'indexing' | 'ready' | 'failed'
  */
 export class PaperStorage {
   private static db: Database | null = null
+  private static readonly DB_DIR = path.resolve(process.cwd(), 'db')
+  private static readonly DB_PATH = path.join(PaperStorage.DB_DIR, 'papers.db')
 
   /**
    * 初始化数据库
@@ -29,8 +33,11 @@ export class PaperStorage {
     }
 
     // 打开数据库连接
+    if (!fs.existsSync(this.DB_DIR)) {
+      fs.mkdirSync(this.DB_DIR, { recursive: true })
+    }
     this.db = await open({
-      filename: './papers.db',
+      filename: this.DB_PATH,
       driver: sqlite3.Database
     })
 
@@ -43,12 +50,6 @@ export class PaperStorage {
         index_status TEXT NOT NULL DEFAULT 'idle'
       )
     `)
-
-    const columns = await this.db.all<Array<{ name: string }>>('PRAGMA table_info(papers)')
-    const hasIndexStatusColumn = columns.some((column) => column.name === 'index_status')
-    if (!hasIndexStatusColumn) {
-      await this.db.exec(`ALTER TABLE papers ADD COLUMN index_status TEXT NOT NULL DEFAULT 'idle'`)
-    }
 
     return this.db
   }

@@ -1,5 +1,7 @@
 import sqlite3 from 'sqlite3'
 import { open, Database } from 'sqlite'
+import fs from 'fs'
+import path from 'path'
 
 export interface StudyNote {
   id?: number
@@ -21,12 +23,18 @@ export interface TermCard {
 
 export class StudyStorage {
   private static db: Database | null = null
+  private static readonly DB_DIR = path.resolve(process.cwd(), 'db')
+  private static readonly DB_PATH = path.join(StudyStorage.DB_DIR, 'study.db')
 
   private static async initDB(): Promise<Database> {
     if (this.db) return this.db
 
+    if (!fs.existsSync(this.DB_DIR)) {
+      fs.mkdirSync(this.DB_DIR, { recursive: true })
+    }
+
     this.db = await open({
-      filename: './study.db',
+      filename: this.DB_PATH,
       driver: sqlite3.Database
     })
 
