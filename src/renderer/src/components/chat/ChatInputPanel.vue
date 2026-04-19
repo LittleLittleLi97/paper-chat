@@ -245,32 +245,46 @@ const onInput = (event: Event): void => {
 .send-button {
   width: 32px;
   height: 32px;
-  border-radius: var(--radius-sm);
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent-strong) 65%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 84%, #ffffff 16%),
+    color-mix(in srgb, var(--accent-strong) 92%, #0f172a 8%)
+  );
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: filter 0.2s ease;
+  transition:
+    filter 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
   padding: 0;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent-strong) 26%, transparent);
 }
 
 .send-button img {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
 
 .send-button:hover:not(:disabled) {
   filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--accent-strong) 30%, transparent);
 }
 
 .send-button:disabled {
   background: color-mix(in srgb, var(--bg-hover) 75%, transparent);
-  color: var(--text-muted);
   border-color: var(--border-subtle);
   cursor: not-allowed;
+  box-shadow: none;
+}
+
+.send-button:disabled img {
+  opacity: 0.55;
 }
 
 .input-hint {
