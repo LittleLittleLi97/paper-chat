@@ -41,6 +41,10 @@ const api = {
     getAllPapers: () => ipcRenderer.invoke('paper:getAllPapers'),
     getPaperById: (id: number) => ipcRenderer.invoke('paper:getPaperById', id),
     deletePaper: (id: number) => ipcRenderer.invoke('paper:deletePaper', id),
+    updateIndexStatus: (
+      id: number,
+      status: 'idle' | 'indexing' | 'ready' | 'failed'
+    ) => ipcRenderer.invoke('paper:updateIndexStatus', id, status),
     readPDF: (path: string) => ipcRenderer.invoke('paper:readPDF', path)
   },
   // RAG 相关API

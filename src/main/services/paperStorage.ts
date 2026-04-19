@@ -8,7 +8,10 @@ export interface Paper {
   id: number
   title: string
   path: string
+  indexStatus: IndexStatus
 }
+
+export type IndexStatus = 'idle' | 'indexing' | 'ready' | 'failed'
 
 /**
  * PDF文件存储服务（后端）
@@ -36,9 +39,16 @@ export class PaperStorage {
       CREATE TABLE IF NOT EXISTS papers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
-        path TEXT NOT NULL UNIQUE
+        path TEXT NOT NULL UNIQUE,
+        index_status TEXT NOT NULL DEFAULT 'idle'
       )
     `)
+
+    const columns = await this.db.all<Array<{ name: string }>>('PRAGMA table_info(papers)')
+    const hasIndexStatusColumn = columns.some((column) => column.name === 'index_status')
+    if (!hasIndexStatusColumn) {
+      await this.db.exec(`ALTER TABLE papers ADD COLUMN index_status TEXT NOT NULL DEFAULT 'idle'`)
+    }
 
     return this.db
   }
@@ -47,12 +57,15 @@ export class PaperStorage {
    * 保存PDF文件信息
    * @param paper PDF文件信息（不需要包含 id，会自动生成）
    */
-  static async savePaper(paper: Omit<Paper, 'id'>): Promise<number> {
+  static async savePaper(
+    paper: Omit<Paper, 'id' | 'indexStatus'> & { indexStatus?: IndexStatus }
+  ): Promise<number> {
     const db = await this.initDB()
     try {
-      const result = await db.run('INSERT INTO papers (title, path) VALUES (?, ?)', [
+      const result = await db.run('INSERT INTO papers (title, path, index_status) VALUES (?, ?, ?)', [
         paper.title,
-        paper.path
+        paper.path,
+        paper.indexStatus || 'idle'
       ])
       return result.lastID as number
     } catch (error) {
@@ -67,7 +80,9 @@ export class PaperStorage {
   static async getAllPapers(): Promise<Paper[]> {
     const db = await this.initDB()
     try {
-      const papers = await db.all<Paper[]>('SELECT * FROM papers')
+      const papers = await db.all<Paper[]>(
+        'SELECT id, title, path, index_status as indexStatus FROM papers ORDER BY id DESC'
+      )
       return papers
     } catch (error) {
       console.error('获取PDF文件失败:', error)
@@ -82,7 +97,10 @@ export class PaperStorage {
   static async getPaperById(id: number): Promise<Paper | undefined> {
     const db = await this.initDB()
     try {
-      const paper = await db.get<Paper>('SELECT * FROM papers WHERE id = ?', [id])
+      const paper = await db.get<Paper>(
+        'SELECT id, title, path, index_status as indexStatus FROM papers WHERE id = ?',
+        [id]
+      )
       return paper
     } catch (error) {
       console.error('获取PDF文件失败:', error)
@@ -100,6 +118,16 @@ export class PaperStorage {
       await db.run('DELETE FROM papers WHERE id = ?', [id])
     } catch (error) {
       console.error('删除PDF文件失败:', error)
+      throw error
+    }
+  }
+
+  static async updateIndexStatus(id: number, status: IndexStatus): Promise<void> {
+    const db = await this.initDB()
+    try {
+      await db.run('UPDATE papers SET index_status = ? WHERE id = ?', [status, id])
+    } catch (error) {
+      console.error('更新索引状态失败:', error)
       throw error
     }
   }

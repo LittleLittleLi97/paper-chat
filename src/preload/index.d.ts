@@ -33,10 +33,11 @@ declare global {
         selectPDF: () => Promise<string[] | null>
       }
       paper: {
-        savePaper: (paper: Omit<Paper, 'id'>) => Promise<number>
+        savePaper: (paper: Omit<Paper, 'id' | 'indexStatus'> & { indexStatus?: Paper['indexStatus'] }) => Promise<number>
         getAllPapers: () => Promise<Paper[]>
         getPaperById: (id: number) => Promise<Paper | null>
         deletePaper: (id: number) => Promise<void>
+        updateIndexStatus: (id: number, status: 'idle' | 'indexing' | 'ready' | 'failed') => Promise<void>
         readPDF: (path: string) => Promise<number[]>
       }
       rag: {
@@ -90,6 +91,7 @@ interface Paper {
   id: number
   title: string
   path: string
+  indexStatus: 'idle' | 'indexing' | 'ready' | 'failed'
 }
 
 export {}

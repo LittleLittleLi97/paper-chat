@@ -4,7 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { ChatStorage } from './services/chatStorage'
 import { AIService } from './services/aiService'
-import { PaperStorage } from './services/paperStorage'
+import { IndexStatus, PaperStorage } from './services/paperStorage'
 import { RAGService } from './services/ragService'
 import { StudyStorage } from './services/studyStorage'
 
@@ -172,6 +172,15 @@ function setupIpcHandlers(): void {
       return await PaperStorage.deletePaper(id)
     } catch (error) {
       console.error('删除PDF文件失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('paper:updateIndexStatus', async (_, id: number, status: IndexStatus) => {
+    try {
+      return await PaperStorage.updateIndexStatus(id, status)
+    } catch (error) {
+      console.error('更新索引状态失败:', error)
       throw error
     }
   })

@@ -61,6 +61,7 @@ interface Paper {
   id: number
   title: string
   path: string
+  indexStatus?: IndexStatus
 }
 
 type IndexStatus = 'idle' | 'indexing' | 'ready' | 'failed'
@@ -167,10 +168,19 @@ const handleReaderContextUpdate = (payload: ReadingContext): void => {
   readingContext.value = payload
 }
 
-const setPaperIndexStatus = (paperId: number, status: IndexStatus): void => {
+const setPaperIndexStatus = async (paperId: number, status: IndexStatus): Promise<void> => {
   indexStatusMap.value = {
     ...indexStatusMap.value,
     [paperId]: status
+  }
+  const target = papers.value.find((paper) => paper.id === paperId)
+  if (target) {
+    target.indexStatus = status
+  }
+  try {
+    await window.api.paper.updateIndexStatus(paperId, status)
+  } catch (error) {
+    console.error(`持久化索引状态失败 (id=${paperId}, status=${status}):`, error)
   }
 }
 
@@ -183,19 +193,19 @@ const addPaper = async (): Promise<void> => {
       const title = path.split('\\').pop() || path
       const newPaper: Omit<Paper, 'id'> = { title, path }
       const id = await window.api.paper.savePaper(newPaper)
-      setPaperIndexStatus(id, 'indexing')
+      const paperWithId: Paper = { ...newPaper, id, indexStatus: 'indexing' }
+      papers.value.push(paperWithId)
+      await setPaperIndexStatus(id, 'indexing')
       window.api.rag
         .addPaper(id, path)
         .then(() => {
-          setPaperIndexStatus(id, 'ready')
+          void setPaperIndexStatus(id, 'ready')
         })
         .catch((err) => {
           console.error(`论文向量化失败 (id=${id}):`, err)
-          setPaperIndexStatus(id, 'failed')
+          void setPaperIndexStatus(id, 'failed')
         })
 
-      const paperWithId: Paper = { ...newPaper, id }
-      papers.value.push(paperWithId)
       if (!selectedPaper.value) {
         selectedPaper.value = paperWithId
       }
@@ -211,7 +221,7 @@ const initPapers = async (): Promise<void> => {
     papers.value = loadedPapers || []
     const statusSeed: Record<number, IndexStatus> = {}
     for (const paper of papers.value) {
-      statusSeed[paper.id] = 'idle'
+      statusSeed[paper.id] = paper.indexStatus || 'idle'
     }
     indexStatusMap.value = statusSeed
     if (!selectedPaper.value && papers.value.length > 0) {
