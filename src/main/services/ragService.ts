@@ -9,8 +9,13 @@ import fs from 'fs'
 import path from 'path'
 import { app } from 'electron'
 import dotenv from 'dotenv'
+import { extractPdfLines } from './pdfLayoutService'
+import { detectStructuredSections } from './pdfStructureService'
+import type { StructuredChunk, StructuredChunkMetadata, StructuredSection } from './types/pdfStructure'
 
 dotenv.config()
+
+type SearchOptions = { paperId?: number }
 
 /**
  * RAG 服务类
@@ -33,6 +38,8 @@ export class RAGService {
     chunkSize: 1000,
     chunkOverlap: 200
   })
+
+  private static readonly NON_SEARCHABLE_SECTION_TYPES = new Set(['title', 'reference'])
 
   /**
    * 初始化：启动 ChromaDB 子进程并连接
@@ -154,25 +161,14 @@ export class RAGService {
 
     await this.removePaper(paperId)
 
-    const buffer = fs.readFileSync(pdfPath)
-    const parser = new PDFParse({ data: buffer })
-    const content = await parser.getText()
-
-    const chunks = await this.splitter.splitText(content.text)
-    const vectors = await this.embeddings.embedDocuments(chunks)
-
-    const ids = chunks.map((_, index) => `paper-${paperId}-chunk-${index}`)
-    const metadatas = chunks.map((_, index) => ({
-      paperId,
-      chunkIndex: index,
-      source: pdfPath
-    }))
+    const chunks = await this.buildPaperChunks(paperId, pdfPath)
+    const vectors = await this.embeddings.embedDocuments(chunks.map((chunk) => chunk.text))
 
     await this.collection.add({
-      ids,
-      documents: chunks,
+      ids: chunks.map((chunk) => chunk.id),
+      documents: chunks.map((chunk) => chunk.text),
       embeddings: vectors,
-      metadatas
+      metadatas: chunks.map((chunk) => chunk.metadata)
     })
 
     console.log(`Paper ${paperId} vectorized: ${chunks.length} chunks`)
@@ -196,7 +192,7 @@ export class RAGService {
    * 全局相似度检索（跨所有论文）
    * 返回 LangChain Document 格式，兼容 tools.ts
    */
-  static async search(query: string, k: number = 4, options: { paperId?: number } = {}): Promise<Document[]> {
+  static async search(query: string, k: number = 4, options: SearchOptions = {}): Promise<Document[]> {
     if (!this.collection) return []
 
     try {
@@ -251,5 +247,116 @@ export class RAGService {
     }
     this.client = null
     this.collection = null
+  }
+
+  private static async buildPaperChunks(paperId: number, pdfPath: string): Promise<StructuredChunk[]> {
+    try {
+      const lines = await extractPdfLines(pdfPath)
+      const sections = detectStructuredSections(lines)
+      const structuredChunks = await this.buildStructuredChunks(paperId, pdfPath, sections)
+
+      if (structuredChunks.length > 0) {
+        this.logStructuredSections(paperId, sections, structuredChunks.length)
+        return structuredChunks
+      }
+
+      console.warn(`Paper ${paperId} structure detected no searchable chunks, fallback to plain text indexing`)
+    } catch (error) {
+      console.warn(`Paper ${paperId} structure-aware indexing failed, fallback to plain text indexing`, error)
+    }
+
+    return this.buildFallbackChunks(paperId, pdfPath)
+  }
+
+  private static async buildStructuredChunks(
+    paperId: number,
+    pdfPath: string,
+    sections: StructuredSection[]
+  ): Promise<StructuredChunk[]> {
+    const searchableSections = sections.filter(
+      (section) =>
+        !this.NON_SEARCHABLE_SECTION_TYPES.has(section.type) &&
+        section.content.trim() &&
+        section.content.trim().length >= 40
+    )
+
+    const structuredChunks: StructuredChunk[] = []
+    let globalChunkIndex = 0
+
+    for (const section of searchableSections) {
+      const sectionChunks = await this.splitter.splitText(section.content)
+
+      for (let chunkInSection = 0; chunkInSection < sectionChunks.length; chunkInSection += 1) {
+        const chunkText = sectionChunks[chunkInSection]?.trim()
+        if (!chunkText) continue
+
+        const metadata: StructuredChunkMetadata = {
+          paperId,
+          source: pdfPath,
+          chunkIndex: globalChunkIndex,
+          chunkInSection,
+          sectionId: section.sectionId,
+          sectionOrder: section.order,
+          sectionTitle: section.title,
+          sectionType: section.type,
+          sectionLevel: section.level,
+          pageStart: section.pageStart,
+          pageEnd: section.pageEnd
+        }
+
+        structuredChunks.push({
+          id: `paper-${paperId}-chunk-${globalChunkIndex}`,
+          text: chunkText,
+          metadata
+        })
+
+        globalChunkIndex += 1
+      }
+    }
+
+    return structuredChunks
+  }
+
+  private static async buildFallbackChunks(paperId: number, pdfPath: string): Promise<StructuredChunk[]> {
+    const buffer = fs.readFileSync(pdfPath)
+    const parser = new PDFParse({ data: buffer })
+    const content = await parser.getText()
+    const fallbackChunks = await this.splitter.splitText(content.text)
+
+    const chunks: StructuredChunk[] = []
+
+    for (let index = 0; index < fallbackChunks.length; index += 1) {
+      const trimmed = fallbackChunks[index]?.trim()
+      if (!trimmed) continue
+
+      chunks.push({
+        id: `paper-${paperId}-chunk-${index}`,
+        text: trimmed,
+        metadata: {
+          paperId,
+          source: pdfPath,
+          chunkIndex: index,
+          chunkInSection: index,
+          sectionId: `paper-${paperId}-body`,
+          sectionOrder: 0,
+          sectionTitle: 'Body',
+          sectionType: 'other',
+          sectionLevel: 1,
+          pageStart: 0,
+          pageEnd: 0
+        } satisfies StructuredChunkMetadata
+      })
+    }
+
+    return chunks
+  }
+
+  private static logStructuredSections(paperId: number, sections: StructuredSection[], chunkCount: number): void {
+    const summary = sections
+      .map((section) => `${section.order}:${section.type}:${section.title} [${section.pageStart}-${section.pageEnd}]`)
+      .join(' | ')
+
+    console.log(`Paper ${paperId} structured sections (${sections.length}) => ${summary}`)
+    console.log(`Paper ${paperId} structured indexing chunks => ${chunkCount}`)
   }
 }
