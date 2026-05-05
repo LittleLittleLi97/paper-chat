@@ -1,34 +1,42 @@
-# electron-app
+# Paper Assistant
 
-An Electron application with Vue and TypeScript
+Paper Assistant 是一个面向论文阅读、理解与沉淀的桌面工作台。它把文献管理、PDF 阅读、AI 问答、论文对比、摘要生成、笔记与术语卡片整合在同一个界面里，帮助用户更快进入论文核心，也更容易把阅读过程变成可复用的知识资产。
 
-## Recommended IDE Setup
+## 主要功能
 
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
+### 文献库
 
-## Project Setup
+- 导入一篇或多篇 PDF 文献。
+- PDF 阅读区
 
-### Install
+### AI 助手
 
-```bash
-$ npm install
-```
+- 支持围绕当前论文自由提问。
+- 支持通用会话和论文范围会话。
+- 自动记录当前论文的问答历史。
+- 回答默认按结构化方式输出，方便阅读和整理。
+- 支持结合当前页码、选中文本和快捷动作生成更贴近阅读场景的回答。
 
-### Development
+### 研究工具
 
-```bash
-$ npm run dev
-```
+内置多种快捷动作，覆盖论文阅读中最常见的高频需求：
 
-### Build
+- `3分钟速读`：快速梳理论文的研究问题、方法和核心贡献。
+- `章节摘要`：按论文结构整理各章节重点。
+- `术语解释`：解释关键术语，并结合论文语境说明含义。
+- `关键结论提取`：提取适合直接写入笔记的结论要点。
 
-```bash
-# For windows
-$ npm run build:win
+### 学习资产
 
-# For macOS
-$ npm run build:mac
+- 阅读笔记：保存关键回答或阅读结论。
+- 术语卡片：提取关键术语与定义。
+- 术语复习：记录最近复习状态。
 
-# For Linux
-$ npm run build:linux
-```
+## 适合场景
+
+- 快速了解一篇论文是否值得深入阅读。
+- 阅读论文时随时追问方法、实验、贡献和局限。
+- 对论文中的术语、段落或结论进行语境化解释。
+- 对比多篇相关论文，整理综述或开题材料。
+- 将阅读过程中的关键理解沉淀为笔记和术语卡片。
+- 建立个人本地论文知识库，并围绕文献持续追问。
