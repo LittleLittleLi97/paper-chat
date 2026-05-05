@@ -12,7 +12,7 @@
         </div>
         <div class="message-content">
           <div :class="['message-bubble', message.role === 'user' ? 'user-bubble' : 'ai-bubble']">
-            <div class="message-text">{{ message.content }}</div>
+            <div class="message-text markdown-body" v-html="renderMarkdown(message.content)"></div>
             <div v-if="message.role === 'assistant' && showSaveNote" class="message-actions">
               <button class="mini-action-btn" @click="$emit('save-note', message)">存为笔记</button>
             </div>
@@ -53,6 +53,8 @@
 </template>
 
 <script setup lang="ts">
+import DOMPurify from 'dompurify'
+import MarkdownIt from 'markdown-it'
 import { nextTick, ref } from 'vue'
 import userIcon from '../../assets/svg/chat-user.svg'
 import assistantIcon from '../../assets/svg/chat-assistant.svg'
@@ -73,6 +75,28 @@ defineEmits<{
 }>()
 
 const messagesContainerRef = ref<HTMLDivElement | null>(null)
+const markdown = new MarkdownIt({
+  breaks: true,
+  html: false,
+  linkify: true,
+  typographer: true
+})
+
+const defaultLinkOpenRenderer = markdown.renderer.rules.link_open
+markdown.renderer.rules.link_open = (tokens, index, options, env, self): string => {
+  const token = tokens[index]
+  token.attrSet('target', '_blank')
+  token.attrSet('rel', 'noopener noreferrer')
+  return defaultLinkOpenRenderer
+    ? defaultLinkOpenRenderer(tokens, index, options, env, self)
+    : self.renderToken(tokens, index, options)
+}
+
+const renderMarkdown = (content: string): string => {
+  return DOMPurify.sanitize(markdown.render(content), {
+    ADD_ATTR: ['target']
+  })
+}
 
 const scrollToBottom = (): void => {
   nextTick(() => {
@@ -168,8 +192,118 @@ defineExpose({ scrollToBottom })
 }
 
 .message-text {
-  white-space: pre-wrap;
   font-size: 13px;
+  line-height: 1.62;
+  overflow-wrap: anywhere;
+}
+
+.markdown-body :deep(*) {
+  max-width: 100%;
+}
+
+.markdown-body :deep(*:first-child) {
+  margin-top: 0;
+}
+
+.markdown-body :deep(*:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown-body :deep(p),
+.markdown-body :deep(ul),
+.markdown-body :deep(ol),
+.markdown-body :deep(blockquote),
+.markdown-body :deep(pre),
+.markdown-body :deep(table) {
+  margin: 0 0 0.7em;
+}
+
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3),
+.markdown-body :deep(h4),
+.markdown-body :deep(h5),
+.markdown-body :deep(h6) {
+  margin: 0.8em 0 0.45em;
+  line-height: 1.28;
+  font-weight: 700;
+}
+
+.markdown-body :deep(h1) {
+  font-size: 18px;
+}
+
+.markdown-body :deep(h2) {
+  font-size: 16px;
+}
+
+.markdown-body :deep(h3),
+.markdown-body :deep(h4),
+.markdown-body :deep(h5),
+.markdown-body :deep(h6) {
+  font-size: 14px;
+}
+
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  padding-left: 1.45em;
+}
+
+.markdown-body :deep(li + li) {
+  margin-top: 0.25em;
+}
+
+.markdown-body :deep(blockquote) {
+  padding: 2px 0 2px 10px;
+  border-left: 3px solid color-mix(in srgb, currentColor 28%, transparent);
+  color: color-mix(in srgb, currentColor 82%, transparent);
+}
+
+.markdown-body :deep(a) {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-body :deep(code) {
+  border-radius: 4px;
+  padding: 1px 5px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  font-size: 0.92em;
+}
+
+.markdown-body :deep(pre) {
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: color-mix(in srgb, #111827 88%, transparent);
+  color: #f8fafc;
+}
+
+.markdown-body :deep(pre code) {
+  display: block;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.markdown-body :deep(table) {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.markdown-body :deep(th),
+.markdown-body :deep(td) {
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.markdown-body :deep(img) {
+  height: auto;
+  border-radius: var(--radius-sm);
 }
 
 .message-actions {
